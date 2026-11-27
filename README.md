@@ -20,22 +20,45 @@ npm test
 npm run build
 ```
 
-## 집 PC에서 실행
+## 집 PC에서 PostgreSQL 모드로 실행
 
-Docker Desktop의 Linux 컨테이너 모드를 사용합니다. `.env.example`을 `.env`로 복사한 뒤 `docker compose up -d --build web`으로 시작합니다. 웹은 집 PC의 루프백 포트 3001에서 접속할 수 있습니다.
+Docker Desktop의 Linux 컨테이너 모드를 사용합니다. 새로 설치할 때는 `.env.example`을 복사해 운영용 `.env.prod`와 개발용 `.env.dev`를 따로 만듭니다. 두 환경의 DB 비밀번호와 인증 비밀키는 서로 다르게 생성합니다.
 
-- **PostgreSQL 초기화** — 로컬 `.env`에 개발용 `POSTGRES_PASSWORD`를 설정하고 `docker compose --profile database up -d db`를 실행합니다. 새 볼륨에서 [초기 마이그레이션](database/migrations/001_create_common.sql)이 실행됩니다. `docker compose exec db psql -U assistant -d assistant -c '\dt'`로 20개 테이블을 확인합니다. 초기화 SQL은 기존 볼륨에 다시 적용되지 않습니다. 앱의 CRUD는 현재 브라우저에 저장됩니다.
-- **Auth.js 로그인** — `DEMO_MODE=false`, 접속 주소에 맞는 `AUTH_URL`, 생성한 `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`를 설정합니다. `node -p "require('node:crypto').randomBytes(32).toString('base64url')"`로 비밀키를 생성합니다. 해시는 비밀번호를 표준 입력으로 전달해 `node scripts/password-hash.mjs`로 생성합니다. PowerShell에서는 아래 명령을 이용할 수 있습니다. 환경 변수 파일과 파일에 넣은 해시는 개인적으로 관리하세요. 인증은 단일 환경 변수 계정과 JWT 세션을 사용합니다.
-- **Ollama** — Windows에서 Ollama를 실행하고 `ollama pull gemma3:4b`를 실행합니다. 로그인 설정을 완료한 뒤 `AI_PROVIDER=ollama`와 `OLLAMA_MODEL=gemma3:4b`를 설정합니다. 웹을 Windows에서 직접 실행할 때는 `OLLAMA_BASE_URL=http://127.0.0.1:11434`를 사용합니다. Docker에서는 `http://host.docker.internal:11434`의 연결을 확인합니다. 연결이 안 되면 웹을 호스트에서 직접 실행해 먼저 검증하세요. Ollama와 PostgreSQL 포트는 외부에 공개하지 않습니다.
-- **원격 접속** — 집 PC에서 검증을 마친 뒤 Tailscale Serve의 HTTPS 주소와 접근 정책을 확인하고 인증 설정을 맞춥니다.
+- 운영용은 `WEB_PORT=3001`, `AUTH_URL=http://localhost:3001`, 개발용은 `WEB_PORT=3002`, `AUTH_URL=http://localhost:3002`로 설정합니다. 실제 접속 주소가 HTTPS 주소라면 `AUTH_URL`도 그 주소로 맞춥니다.
+- `DEMO_MODE=false`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `AUTH_SECRET`, 최초 계정의 `ADMIN_EMAIL` 및 `ADMIN_PASSWORD_HASH`를 설정합니다.
+- Compose 내부의 `DATABASE_URL` 형식은 `postgresql://assistant:<URL로 인코딩한 비밀번호>@db:5432/assistant`입니다. 외부 PostgreSQL을 사용할 때는 제공자의 연결 URL 및 TLS 설정을 사용합니다. 마이그레이션에는 세션 단위 잠금을 지원하는 직접 접속 또는 세션 풀러를 사용합니다.
+- `node -p "require('node:crypto').randomBytes(32).toString('base64url')"`로 `AUTH_SECRET`을 생성합니다. PowerShell 7 이상에서는 `Read-Host "온하루 비밀번호" -MaskInput | node scripts/password-hash.mjs`로 첫 계정의 해시를 생성합니다. 계정 생성은 기존 이메일의 비밀번호를 덮어쓰지 않습니다.
 
-PowerShell 7 이상에서 비밀번호 입력과 해시 생성 예시
+새 운영 환경에서는 다음 순서로 실행합니다.
 
-```powershell
-Read-Host "개발용 비밀번호" -MaskInput | node scripts/password-hash.mjs
+```sh
+docker compose --env-file .env.prod -p onharu-prod --profile database up -d --wait db
+docker compose --env-file .env.prod -p onharu-prod build web
+docker compose --env-file .env.prod -p onharu-prod run --rm --no-deps web node scripts/db.mjs migrate
+docker compose --env-file .env.prod -p onharu-prod run --rm --no-deps web node scripts/db.mjs create-owner
+docker compose --env-file .env.prod -p onharu-prod up -d web
 ```
 
-Ollama Provider는 한국어 채팅에 응답합니다. 업무 데이터 조회와 변경, 채팅 기억의 모델 연동, DB 로그인, 운영 백업은 후속 작업입니다.
+개발 환경은 같은 명령에서 `.env.dev`와 `-p onharu-dev`를 사용합니다. 프로젝트별 Compose 네트워크와 볼륨이 분리되며 PostgreSQL 포트는 호스트에 게시하지 않습니다. 외부 PostgreSQL을 쓰는 경우 Compose `db`를 시작하는 첫 명령은 생략합니다. 개발 셸에서 DB에 접근할 수 있다면 환경 변수를 주입한 뒤 `npm run db:migrate`와 `npm run db:create-owner`를 직접 실행할 수도 있습니다.
+
+### 기존 DB와 브라우저 데이터
+
+기존 Compose에서 업그레이드할 때는 먼저 DB 백업을 검증하고 **기존 폴더, 프로젝트 이름, 볼륨**을 사용합니다. 이름을 새 운영 프로젝트로 바꾸면 별도 빈 볼륨이 연결됩니다. 변경된 이미지를 빌드하고 일반 `migrate`를 실행합니다. 기존 초기화 스크립트로 만든 DB라는 진단을 받으면, 이전 001–003 중 적용된 범위를 확인한 뒤 다음 명령을 실행합니다.
+
+```sh
+docker compose run --rm --no-deps web node scripts/db.mjs migrate --adopt-legacy
+```
+
+마이그레이션은 파일명과 체크섬을 기록하며, 이미 적용한 SQL과 기존 행을 유지합니다. 기존 이메일이 대소문자만 다른 상태로 중복되어 있으면 마이그레이션이 중단됩니다. 계정 병합·삭제는 관리자가 판단합니다.
+
+설정의 **브라우저 데이터 가져오기**에서 대상과 계정을 확인한 뒤 가져옵니다. 데모와 운영 주소가 다르면 데모 설정에서 JSON 파일로 내보냈다가 운영 설정에서 선택합니다. 기존 PostgreSQL의 대상 영역에 데이터가 있으면 덮어쓰지 않으며, 계정당 한 번만 가져옵니다. 파일과 브라우저 원본은 그대로 남습니다. 운영 중 DB 연결이 끊기면 오류를 표시합니다.
+
+### 집 PC에서 확인할 항목
+
+- Windows Docker Desktop에서 운영·개발 프로젝트의 볼륨과 계정이 서로 다른지, DB 포트가 외부에 열리지 않는지 확인합니다.
+- 기존 운영 볼륨의 백업·복원과 마이그레이션을 먼저 확인한 뒤 실제 데이터를 가져옵니다.
+- 집 PC의 실제 접속 주소와 `AUTH_URL` 일치, Tailscale Serve HTTPS 및 기기 접근 정책을 확인합니다.
+- 기본 AI Provider는 Mock입니다. 실제 Ollama 연결과 AI 도구 호출 검증은 후속 작업입니다.
 
 ## 설계 문서
 

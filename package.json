@@ -11,7 +11,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --test tests/*.test.ts",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:create-owner": "node scripts/db.mjs create-owner"
   },
   "dependencies": {
     "@fullcalendar/react": "7.1.5",
@@ -22,6 +24,7 @@
     "next": "16.4.6",
     "next-auth": "5.0.0-beta.32",
     "papaparse": "5.7.1",
+    "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "recharts": "3.11.1",
@@ -32,6 +35,7 @@
     "@tailwindcss/postcss": "4.3.5",
     "@types/node": "24.19.4",
     "@types/papaparse": "5.5.2",
+    "@types/pg": "8.23.1",
     "@types/react": "19.3.3",
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",

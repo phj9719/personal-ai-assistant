@@ -88,7 +88,7 @@ type Editor = {kind:"rule";rule?:Rule} | {kind:"account";account?:Account} | {ki
 type Removal = {kind:"rule"|"account"|"transfer";id:string};
 
 export function FinanceView({state,save,records,updateRecords,utilities,today,theme}:{
-  state:FinanceState;save:(state:FinanceState)=>void;records:Records;updateRecords:(records:Records)=>void; utilities:UtilityState; today:string; theme:"light"|"dark";
+  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
 }) {
   const [tab,setTab] = useState(0);
   const [month,setMonth] = useState(today.slice(0,7));
@@ -126,10 +126,10 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
         {status && <p role="status" className="utility-status">{status}</p>}
         {tab===1 && <>
           <section className="panel">
-            <div className="finance-heading"><h2>월별 예정·납부 내역</h2><Button disabled={!validMonth(month)} onClick={()=>{
+            <div className="finance-heading"><h2>월별 예정·납부 내역</h2><Button disabled={!validMonth(month)} onClick={async ()=>{
               const monthly = createMonth(state.rules,state.monthly,month);
               const added = monthly.length-state.monthly.length;
-              if (added) save({...state,monthly});
+              if (added && !await save({...state,monthly})) return;
               setStatus(added ? added+"건의 예정 내역을 생성했습니다." : "새로 생성할 예정 내역이 없습니다.");
             }}>이 달 예정 내역 생성</Button></div>
             <MonthlyList rows={rows} accounts={state.accounts} utilities={utilities} onEdit={row=>setEditing({kind:"monthly",row})}/>
@@ -170,26 +170,27 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
           <p className="empty">조회 월을 선택해 주세요.</p>)}
       </>}
     </section>
-    {editing?.kind==="rule" && <RuleForm rule={editing.rule} rules={state.rules} accounts={state.accounts} today={today} onClose={close} onSave={rule=>{
-      save({...state,rules:replace(state.rules,rule)}); close();
+    {editing?.kind==="rule" && <RuleForm rule={editing.rule} rules={state.rules} accounts={state.accounts} today={today} onClose={close} onSave={async rule=>{
+      if (await save({...state,rules:replace(state.rules,rule)})) close();
     }}/>}
-    {editing?.kind==="account" && <AccountForm account={editing.account} onClose={close} onSave={account=>{
-      save({...state,accounts:replace(state.accounts,account)}); close();
+    {editing?.kind==="account" && <AccountForm account={editing.account} onClose={close} onSave={async account=>{
+      if (await save({...state,accounts:replace(state.accounts,account)})) close();
     }}/>}
-    {editing?.kind==="transfer" && <TransferForm transfer={editing.transfer} today={today} accounts={state.accounts} onClose={close} onSave={transfer=>{
-      save({...state,transfers:replace(state.transfers,transfer)}); setMonth(transfer.date.slice(0,7)); close();
+    {editing?.kind==="transfer" && <TransferForm transfer={editing.transfer} today={today} accounts={state.accounts} onClose={close} onSave={async transfer=>{
+      if (await save({...state,transfers:replace(state.transfers,transfer)})) {setMonth(transfer.date.slice(0,7));close();}
     }}/>}
-    {editing?.kind==="monthly" && <MonthlyForm row={editing.row} accounts={state.accounts} today={today} onClose={close} onSave={row=>{
-      save({...state,monthly:state.monthly.map(item=>item.ruleId===row.ruleId && item.month===row.month ? row : item)}); close();
+    {editing?.kind==="monthly" && <MonthlyForm row={editing.row} accounts={state.accounts} today={today} onClose={close} onSave={async row=>{
+      if (await save({...state,monthly:state.monthly.map(item=>item.ruleId===row.ruleId && item.month===row.month ? row : item)})) close();
     }}/>}
     {removing && <dialog ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setRemoving(null)} className="dialog" aria-labelledby="finance-remove-title">
       <h2 id="finance-remove-title">{removing.kind==="account" ? "결제수단 보관" : "내역 삭제"}</h2>
       <p>{removing.kind==="transfer" ? "선택한 이체 내역을 삭제할까요?" : "이미 생성된 월별 내역과 납부 기록은 보존됩니다."}</p>
-      <div className="row-actions"><Button variant="outline" onClick={()=>setRemoving(null)}>취소</Button><Button onClick={()=>{
-        if (removing.kind==="rule") save({...state,rules:state.rules.map(item=>item.id===removing.id ? {...item,active:false,archived:true} : item)});
-        else if (removing.kind==="account") save({...state,accounts:state.accounts.map(item=>item.id===removing.id ? {...item,archived:true} : item)});
-        else save({...state,transfers:state.transfers.filter(item=>item.id!==removing.id)});
-        setRemoving(null);
+      <div className="row-actions"><Button variant="outline" onClick={()=>setRemoving(null)}>취소</Button><Button onClick={async ()=>{
+        const next = removing.kind==="rule"
+          ? {...state,rules:state.rules.map(item=>item.id===removing.id ? {...item,active:false,archived:true} : item)}
+          : removing.kind==="account" ? {...state,accounts:state.accounts.map(item=>item.id===removing.id ? {...item,archived:true} : item)}
+          : {...state,transfers:state.transfers.filter(item=>item.id!==removing.id)};
+        if (await save(next)) setRemoving(null);
       }}>{removing.kind==="account" ? "보관" : "삭제"}</Button></div>
     </dialog>}
   </>;

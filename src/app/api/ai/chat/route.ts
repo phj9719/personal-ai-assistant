@@ -1,8 +1,12 @@
-import {auth, authEnabled} from "@/auth";
+import {authenticatedUserId, authEnabled} from "@/auth";
+import {isSameOrigin} from "@/services/workspace-access";
 import {conversation, MockProvider, OllamaProvider} from "@/lib/ai/provider";
 
 export async function POST(request: Request) {
-  if (authEnabled && !(await auth())) return Response.json({error:"로그인이 필요합니다."},{status:401});
+  if (authEnabled) {
+    if (!(await authenticatedUserId())) return Response.json({error:"로그인이 필요합니다."},{status:401});
+    if (!isSameOrigin(request.headers.get("origin"),process.env.AUTH_URL)) return Response.json({error:"요청 출처를 확인할 수 없습니다."},{status:403});
+  }
   if (!request.headers.get("content-type")?.startsWith("application/json")) {
     return Response.json({error:"JSON 요청이 필요합니다."},{status:415});
   }

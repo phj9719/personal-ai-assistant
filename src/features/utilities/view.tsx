@@ -61,7 +61,7 @@ function BillDetails({bill}:{bill:Bill}) {
 }
 
 type Filter = "all" | Scope;
-export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save:(value:UtilityState)=>void;today:string;legacy:Entry[]}) {
+export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save:(value:UtilityState)=>Promise<boolean>;today:string;legacy:Entry[]}) {
   const {bills,residence} = state;
   const current = today.slice(0,7);
   const [year,setYear] = useState(current.slice(0,4));
@@ -95,8 +95,8 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
         <Button variant="outline" disabled={!visible.length} onClick={()=>downloadBills(visible)}><Download size={16}/>CSV 내보내기</Button>
       </div>
     </div>
-    <ResidenceSettings residence={residence} onSave={next=>{
-      save({residence:next,bills:bills.map(bill=>({...bill,scope:effectiveScope(bill,next)}))});
+    <ResidenceSettings residence={residence} onSave={async next=>{
+      if (!await save({residence:next,bills:bills.map(bill=>({...bill,scope:effectiveScope(bill,next)}))})) return;
       setStatus("거주 기간을 저장했습니다.");
     }}/>
     <section className="panel utility-filters" aria-label="조회 조건">
@@ -149,16 +149,16 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
     <UtilityCharts bills={visible} residence={residence}/>
     {!!legacy.length && <details className="panel"><summary>이전 형식의 공과금 기록</summary><p className="muted">이전 기록은 아래에서 확인할 수 있습니다. 청구 종류와 사용 구분을 확인한 뒤 월별 청구로 등록하세요.</p>
       <ul>{legacy.map(row=><li key={row.id}>{row.date} · {row.title} · {money(row.amount)} · {row.detail}</li>)}</ul></details>}
-    {editing && <BillEditor {...editing} bills={bills} residence={residence} onClose={()=>setEditing(null)} onSave={bill=>{
-      save({...state,bills:replaceBills(bills.filter(item=>billKey(item)!==editing.originalKey),[bill])});
+    {editing && <BillEditor {...editing} bills={bills} residence={residence} onClose={()=>setEditing(null)} onSave={async bill=>{
+      if (!await save({...state,bills:replaceBills(bills.filter(item=>billKey(item)!==editing.originalKey),[bill])})) return;
       setEditing(null);
       setYear(bill.month.slice(0,4));
       if (month) setMonth(bill.month.slice(4));
       setScope("all");
       setStatus("청구 내역을 저장했습니다.");
     }}/>}
-    {importing && <ImportPanel state={state} onClose={()=>setImporting(false)} onImport={changes=>{
-      save({...state,bills:replaceBills(bills,changes)});
+    {importing && <ImportPanel state={state} onClose={()=>setImporting(false)} onImport={async changes=>{
+      if (!await save({...state,bills:replaceBills(bills,changes)})) return;
       setImporting(false);
       const last = changes.map(bill=>bill.month).sort().at(-1);
       if (last) setYear(last.slice(0,4));
@@ -168,8 +168,8 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
     }}/>}
     {deleting && <dialog ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setDeleting(null)} aria-labelledby="utility-delete" className="dialog">
       <h2 id="utility-delete">청구 삭제</h2><p>{deleting.month} {kindNames[deleting.kind]} 내역을 삭제할까요?</p>
-      <div className="row-actions"><Button variant="outline" onClick={()=>setDeleting(null)}>취소</Button><Button onClick={()=>{
-        save({...state,bills:bills.filter(bill=>billKey(bill)!==billKey(deleting))});
+      <div className="row-actions"><Button variant="outline" onClick={()=>setDeleting(null)}>취소</Button><Button onClick={async ()=>{
+        if (!await save({...state,bills:bills.filter(bill=>billKey(bill)!==billKey(deleting))})) return;
         setDeleting(null);
         setStatus("청구 내역을 삭제했습니다.");
       }}>삭제</Button></div>

@@ -3,14 +3,13 @@
 import { useRef, useState } from "react";
 import { ArrowUp, AudioLines, ChevronDown, History, Plus } from "lucide-react";
 import { Button } from "./ui/button";
-import { useLocal } from "./use-local";
+import { useWorkspaceData } from "./workspace-data";
+import type { Message } from "@/features/workspace/data";
 
-type Message = {role:"user"|"assistant";content:string};
-type Session = {id:string; title:string; messages:Message[]};
 const prompts = ["오늘 일정을 보고 싶어요", "할 일을 정리하고 싶어요", "이번 달 지출은 어디서 보나요?"];
 
 export function Chat() {
-  const [sessions, save] = useLocal<Session[]>("onharu-chat-v1", []);
+  const [sessions, save] = useWorkspaceData("chat", []);
   const [id, select] = useState<string>();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -36,19 +35,20 @@ export function Chat() {
     const current = session ?? {id:crypto.randomUUID(),title:content.slice(0,45),messages:[]};
     const messages:Message[] = [...current.messages,{role:"user",content}];
     const others = sessions.filter(item=>item.id !== current.id);
-    save([{...current,messages},...others]);
-    select(current.id);
-    setDraft("");
     setError("");
     setPending(true);
     try {
+      if (!await save([{...current,messages},...others])) return;
+      select(current.id);
+      setDraft("");
       const response = await fetch("/api/ai/chat",{
         method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,
         body:JSON.stringify({messages:messages.slice(-10)}),
       });
       const result = await response.json();
       if (!response.ok || typeof result.content !== "string") throw new Error("AI 응답 오류");
-      save([{...current,messages:[...messages,{role:"assistant",content:result.content}]},...others]);
+      // The first write advanced the document revision before this response arrived.
+      await save([{...current,messages:[...messages,{role:"assistant",content:result.content}]},...others]);
     } catch {
       setError(controller.signal.aborted ? "응답을 취소했습니다." : "응답을 받지 못했습니다. 다시 질문해 주세요.");
     } finally {

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AuthError } from "next-auth";
-import { auth, authEnabled, signIn, signOut } from "@/auth";
+import { authenticatedUserId, authEnabled, signIn, signOut } from "@/auth";
+import { WorkspaceStorage } from "@/components/workspace-data";
 import { Workspace } from "@/components/workspace";
 import { screens } from "@/features/navigation";
 import { seoulDate } from "@/features/modules";
@@ -30,10 +31,10 @@ export default async function Screen({params, searchParams}: {params:Promise<{sc
     </section></main>;
   }
   if (!Object.hasOwn(screens,screen)) notFound();
-  if (authEnabled && !(await auth())) redirect("/login");
+  if (authEnabled && !(await authenticatedUserId())) redirect("/login");
   const logout = authEnabled ? <form action={async () => {
     "use server";
     await signOut({redirectTo:"/login"});
   }}><Button variant="outline">로그아웃</Button></form> : null;
-  return <Workspace screen={screen as keyof typeof screens} logout={logout} today={seoulDate()} />;
+  return <WorkspaceStorage remote={authEnabled}><Workspace demo={!authEnabled} screen={screen as keyof typeof screens} logout={logout} today={seoulDate()} /></WorkspaceStorage>;
 }

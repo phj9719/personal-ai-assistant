@@ -13,13 +13,15 @@ function subscribe(listener: () => void) {
   };
 }
 
+const noSubscription = () => () => {};
+
 function read(key: string) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
-export function useLocal<T>(key: string, initial: T) {
+export function useLocal<T>(key: string, initial: T, enabled = true) {
   const [fallback, setFallback] = useState<{value:T}>();
-  const stored = useSyncExternalStore(subscribe, () => read(key), () => null);
+  const stored = useSyncExternalStore(enabled ? subscribe : noSubscription, () => enabled ? read(key) : null, () => null);
   let value = initial;
   if (fallback) {
     value = fallback.value;

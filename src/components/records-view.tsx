@@ -43,7 +43,7 @@ function TransactionsChart({ rows, groups }: {rows:Entry[];groups:readonly strin
   </ResponsiveContainer></section>;
 }
 
-export function RecordsView({module,records,today,theme,consumption,onChange}:{module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>void}) {
+export function RecordsView({module,records,today,theme,consumption,onChange}:{module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
   const config = modules[module];
   const [query,setQuery] = useState("");
   const [group,setGroup] = useState("");
@@ -55,7 +55,7 @@ export function RecordsView({module,records,today,theme,consumption,onChange}:{m
     (!monthly || !month || row.date.startsWith(month)) &&
     `${row.title} ${row.detail}`.toLowerCase().includes(query.toLowerCase()));
   const stats = summarize(records,month);
-  function replace(entries:Entry[]) {onChange({...records,[module]:entries});}
+  function replace(entries:Entry[]) {return onChange({...records,[module]:entries});}
   return <>
     <div className="page-title"><div><h1>{config.title}</h1><p className="muted">{config.description}</p></div>
     <Button onClick={()=>setEditing({id:"",title:"",group:group || config.groups[0],date:today,amount:0,detail:""})}><Plus size={18}/>추가</Button></div>
@@ -92,7 +92,7 @@ export function RecordsView({module,records,today,theme,consumption,onChange}:{m
         </li>)}</ul> : <p className="empty">표시할 항목이 없습니다.</p>}
       </section>
     </div>
-    {editing && <dialog ref={element=>{if (element && !element.open) element.showModal();}} onCancel={()=>setEditing(null)} aria-labelledby="entry-title" className="dialog"><form onSubmit={event=>{
+    {editing && <dialog ref={element=>{if (element && !element.open) element.showModal();}} onCancel={()=>setEditing(null)} aria-labelledby="entry-title" className="dialog"><form onSubmit={async event=>{
       event.preventDefault();
       const data = new FormData(event.currentTarget);
       const title = String(data.get("title")).trim();
@@ -103,8 +103,7 @@ export function RecordsView({module,records,today,theme,consumption,onChange}:{m
         return;
       }
       const item:Entry = {id:editing.id || crypto.randomUUID(),title,group:String(data.get("group")),date:String(data.get("date")),amount:Number(data.get("amount") ?? 0),detail:String(data.get("detail")).trim()};
-      replace(editing.id ? records[module].map(row=>row.id === item.id ? item : row) : [...records[module],item]);
-      setEditing(null);
+      if (await replace(editing.id ? records[module].map(row=>row.id === item.id ? item : row) : [...records[module],item])) setEditing(null);
     }}>
       <h2 id="entry-title">{editing.id ? "항목 수정" : "항목 추가"}</h2>
       <label>이름<input autoFocus name="title" defaultValue={editing.title} required maxLength={100} onInput={event=>event.currentTarget.setCustomValidity("")}/></label>
@@ -114,6 +113,6 @@ export function RecordsView({module,records,today,theme,consumption,onChange}:{m
       <label>상세 내용<textarea name="detail" maxLength={1000} defaultValue={editing.detail}/></label>
       <div className="row-actions"><Button type="button" variant="outline" onClick={()=>setEditing(null)}>취소</Button><Button type="submit">저장</Button></div>
     </form></dialog>}
-    {deleting && <dialog ref={element=>{if (element && !element.open) element.showModal();}} onCancel={()=>setDeleting(null)} aria-labelledby="delete-title" className="dialog"><h2 id="delete-title">항목 삭제</h2><p>{deleting.title} 항목을 삭제할까요?</p><div className="row-actions"><Button variant="outline" onClick={()=>setDeleting(null)}>취소</Button><Button onClick={()=>{replace(records[module].filter(row=>row.id !== deleting.id));setDeleting(null);}}>삭제</Button></div></dialog>}
+    {deleting && <dialog ref={element=>{if (element && !element.open) element.showModal();}} onCancel={()=>setDeleting(null)} aria-labelledby="delete-title" className="dialog"><h2 id="delete-title">항목 삭제</h2><p>{deleting.title} 항목을 삭제할까요?</p><div className="row-actions"><Button variant="outline" onClick={()=>setDeleting(null)}>취소</Button><Button onClick={async ()=>{if (await replace(records[module].filter(row=>row.id !== deleting.id))) setDeleting(null);}}>삭제</Button></div></dialog>}
   </>;
 }

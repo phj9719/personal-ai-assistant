@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AudioLines, Menu, Moon, Sun } from "lucide-react";
 import { screens } from "@/features/navigation";
-import { sampleRecords, type Records } from "@/features/modules";
+import { sampleRecords } from "@/features/modules";
 import { RecordsView, Summary } from "./records-view";
 import { Chat } from "./chat";
 import { financeStatistics, initialFinance } from "@/features/finance/model";
@@ -13,16 +13,16 @@ import { UtilitiesView } from "@/features/utilities/view";
 import { comparison, sampleUtilities } from "@/features/utilities/model";
 import { Button } from "./ui/button";
 
-import {useLocal} from "./use-local";
+import {BrowserImport,useWorkspaceData,type Save} from "./workspace-data";
 
 type Screen = keyof typeof screens;
 const main = ["assistant","dashboard","schedule","tasks"] as const;
 
-export function Workspace({ screen, today, logout }: {screen:Screen; today:string; logout:React.ReactNode}) {
-  const [records, save] = useLocal<Records>("onharu-records-v1", sampleRecords(today));
-  const [utilities, saveUtilities] = useLocal("onharu-utilities-v1", sampleUtilities(today));
-  const [finance, saveFinance] = useLocal("onharu-fixed-finance-v1",initialFinance(today));
-  const [theme, setTheme] = useLocal<"light"|"dark">("onharu-theme-v1","light");
+export function Workspace({ screen, today, logout, demo }: {screen:Screen; today:string; logout:React.ReactNode; demo:boolean}) {
+  const [records, save] = useWorkspaceData("records", sampleRecords(today));
+  const [utilities, saveUtilities] = useWorkspaceData("utilities", sampleUtilities(today));
+  const [finance, saveFinance] = useWorkspaceData("finance",initialFinance(today));
+  const [theme, setTheme] = useWorkspaceData("theme","light");
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   const consumption = screen === "dashboard" || screen === "analytics"
@@ -36,7 +36,7 @@ export function Workspace({ screen, today, logout }: {screen:Screen; today:strin
     <aside className={expanded ? "sidebar open" : "sidebar"}>
       <Link className="brand" href="/assistant"><span><AudioLines size={23}/></span><strong>온하루</strong></Link>
       <nav aria-label="전체 메뉴">{(Object.keys(screens) as Screen[]).map(link)}</nav>
-      <div className="sidebar-footer"><span className="sample-dot"/> 가상 데이터 모드</div>
+      <div className="sidebar-footer"><span className="sample-dot"/> {demo ? "가상 데이터 모드" : "PostgreSQL 저장"}</div>
     </aside>
     <div className="content">
       <header><span>{screens[screen].title}</span><Button variant="ghost" aria-label={theme === "light" ? "다크 모드" : "라이트 모드"} onClick={toggle}>{theme === "light" ? <Moon size={19}/> : <Sun size={19}/>}</Button></header>
@@ -48,8 +48,8 @@ export function Workspace({ screen, today, logout }: {screen:Screen; today:strin
   </div>;
 }
 
-function Settings({theme,setTheme,logout}:{theme:"light"|"dark";setTheme:(theme:"light"|"dark")=>void;logout:React.ReactNode}) {
-  const [memories, save] = useLocal<string[]>("onharu-memories-v1", []);
+function Settings({theme,setTheme,logout}:{theme:"light"|"dark";setTheme:Save<"light"|"dark">;logout:React.ReactNode}) {
+  const [memories, save] = useWorkspaceData("memories", []);
   return <>
     <h1>설정</h1>
     <section className="panel settings">
@@ -58,15 +58,14 @@ function Settings({theme,setTheme,logout}:{theme:"light"|"dark";setTheme:(theme:
       <p>AI Provider와 모델은 서버 환경 변수에서 설정합니다.</p>
       {logout}
     </section>
+    <BrowserImport/>
     <section className="panel settings">
       <h2>메모리</h2>
-      <p>이 브라우저에 저장됩니다.</p>
-      <form onSubmit={event=>{
+      <form onSubmit={async event=>{
         event.preventDefault();
         const form = event.currentTarget;
         const value = String(new FormData(form).get("memory")).trim();
-        if (value) save([...memories,value]);
-        form.reset();
+        if (value && await save([...memories,value])) form.reset();
       }}><label>기억할 내용<input name="memory" maxLength={300} required/></label><Button type="submit">저장</Button></form>
       <ul>{memories.map((memory,index)=><li key={index}>{memory} <Button variant="ghost" onClick={()=>save(memories.filter((_,position)=>position !== index))}>삭제</Button></li>)}</ul>
     </section>
