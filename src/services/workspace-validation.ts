@@ -1,3 +1,4 @@
+import {baseballSchema} from "./baseball-validation.ts";
 import {settlementsSchema} from "./settlement-validation.ts";
 import {z} from "zod";
 import {modules} from "../features/modules.ts";
@@ -86,7 +87,7 @@ const chat = z.array(z.strictObject({
 })).max(1000).refine(rows=>unique(rows,row=>row.id));
 
 const schemas = {
-  records,utilities,finance,settlements:settlementsSchema,chat,memories:z.array(z.string().trim().min(1).max(300)).max(2000),
+  records,utilities,finance,settlements:settlementsSchema,baseball:baseballSchema,chat,memories:z.array(z.string().trim().min(1).max(300)).max(2000),
   theme:z.enum(["light","dark"]),
 } satisfies {[K in Domain]:z.ZodType<WorkspaceData[K]>};
 

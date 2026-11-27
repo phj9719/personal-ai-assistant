@@ -11,6 +11,7 @@ import {
   methods, modes, outstanding, purposes, type Account, type FinanceState, type Monthly, type Payment, type Rule, type Transfer,
 } from "./model";
 
+import {baseballExpenses,type Baseball} from "../baseball/model";
 import {SettlementsView} from "../settlements/view";
 import {cashPayments,linkedIds,type Settlements} from "../settlements/model";
 
@@ -50,10 +51,10 @@ function MonthlyList({rows,accounts,utilities,onEdit}:{rows:Monthly[];accounts:A
   </li>)}</ul> : <p className="empty">생성된 월별 내역이 없습니다.</p>}</>;
 }
 
-function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,settlements}:{
-  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;settlements:Settlements;
+function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,settlements,baseball}:{
+  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;settlements:Settlements;baseball:Baseball;
 }) {
-  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities,settlements);
+  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities,settlements,baseball);
   const linked = linkedIds(settlements);
   const payments = new Map<string,number>();
   function addPayment(payment:Payment|null,amount:number) {
@@ -66,6 +67,9 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,s
   for (const row of cashPayments(settlements,month)) {
     const label = row.account ? "정산·대납 · "+row.account : "정산·대납 · 결제수단 미지정";
     payments.set(label,(payments.get(label) ?? 0)+row.amount*100);
+  }
+  for (const row of baseballExpenses(baseball,month,settlements,records.finance)) {
+    payments.set(row.account,(payments.get(row.account) ?? 0)+row.cash*100);
   }
   const dates = new Map<string,ReturnType<typeof expected>[]>();
   for (const row of monthly.filter(row=>row.month===month && row.paidOn===null)) {
@@ -95,8 +99,8 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,s
 type Editor = {kind:"rule";rule?:Rule} | {kind:"account";account?:Account} | {kind:"transfer";transfer?:Transfer} | {kind:"monthly";row:Monthly};
 type Removal = {kind:"rule"|"account"|"transfer";id:string};
 
-export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements}:{
-  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
+export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements,baseball}:{
+  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;baseball:Baseball;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
 }) {
   const [tab,setTab] = useState(0);
   const [month,setMonth] = useState(today.slice(0,7));
@@ -124,7 +128,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
     </div>
     <section role="tabpanel" id="finance-panel" aria-labelledby={"finance-tab-"+tab}>
       {tab===0 ? <>
-        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords} linked={linkedIds(settlements)}/>
+        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords} linked={new Set([...linkedIds(settlements),...baseball.tickets.flatMap(row=>row.entryId ? [row.entryId] : [])])}/>
         <p className="muted">이 탭에는 원본 거래금액이 표시됩니다. 본인 소비와 실제 자금 유출은 월별 통계에서 확인할 수 있습니다.</p>
       </> : tab===5 ? <SettlementsView cases={settlements} save={saveSettlements} ledger={records.finance}
         accounts={state.accounts.filter(account=>!account.archived).map(account=>account.institution+" · "+account.name)} today={today}/> : <>
@@ -175,7 +179,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
               <Button variant="ghost" aria-label={account.name+" 보관"} onClick={()=>setRemoving({kind:"account",id:account.id})}>보관</Button></div>
           </li>)}</ul>
         </section>}
-        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements}/> :
+        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements} baseball={baseball}/> :
           <p className="empty">조회 월을 선택해 주세요.</p>)}
       </>}
     </section>

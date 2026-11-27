@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import type { BaseballEvent } from "@/features/baseball/model";
 import { useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
@@ -44,7 +46,7 @@ function TransactionsChart({ rows, groups }: {rows:Entry[];groups:readonly strin
   </ResponsiveContainer></section>;
 }
 
-export function RecordsView({module,records,today,theme,consumption,onChange,linked}:{linked?:Set<string>;module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
+export function RecordsView({module,records,today,theme,consumption,onChange,linked,baseballEvents=[]}:{baseballEvents?:BaseballEvent[];linked?:Set<string>;module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
   const config = modules[module];
   const [query,setQuery] = useState("");
   const [group,setGroup] = useState("");
@@ -81,12 +83,20 @@ export function RecordsView({module,records,today,theme,consumption,onChange,lin
             headerToolbar={{start:"title",center:"",end:"today prev,next"}}
             toolbarClass="calendar-toolbar"
             dayMaxEvents={2}
-            events={rows.map(row=>({id:row.id,title:row.title,date:row.date}))}
-            eventClick={event=>setEditing(rows.find(row=>row.id === event.event.id) ?? null)}
+            timeZone="UTC"
+            events={[...rows.map(row=>({id:row.id,title:row.title,date:row.date})),...baseballEvents.map(event=>({
+              ...event,url:"/baseball?game="+encodeURIComponent(event.gameId),backgroundColor:event.color,borderColor:event.color,textColor:"#fff",
+            }))]}
+            eventClick={event=>{
+              if (!event.event.url) setEditing(rows.find(row=>row.id === event.event.id) ?? null);
+            }}
           />
+          {baseballEvents.length>0 && <details><summary>야구 연동 일정</summary><ul className="rows">{baseballEvents.map(event=><li key={event.id}>
+            <Link href={"/baseball?game="+encodeURIComponent(event.gameId)} className="baseball-link">{event.title}</Link><span>{event.start.replace("T"," ")}</span>
+          </li>)}</ul></details>}
         </div>}
         {rows.length ? <ul className="rows">{rows.map(row=><li key={row.id}>
-          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}{linked?.has(row.id) && <p>정산·대납에 연결됨 · 연결 해제 후 수정·삭제할 수 있습니다.</p>}</div>
+          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}{linked?.has(row.id) && <p>야구 또는 정산·대납에 연결됨 · 연결 해제 후 수정·삭제할 수 있습니다.</p>}</div>
           <div className="row-actions">{module === "tasks" && row.group !== "완료" && <Button variant="outline" onClick={()=>replace(records[module].map(item=>item.id === row.id ? {...item,group:"완료"} : item))}>완료</Button>}
           <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 수정"} onClick={()=>setEditing(row)}><Pencil size={17}/></Button>
           <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 삭제"} onClick={()=>setDeleting(row)}><Trash2 size={17}/></Button></div>

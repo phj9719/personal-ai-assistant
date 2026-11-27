@@ -1,4 +1,4 @@
-import { AudioLines, CalendarDays, ChartNoAxesCombined, CircleCheck, CodeXml, House, NotebookPen, ReceiptText, Refrigerator, Settings2, Wallet } from "lucide-react";
+import { AudioLines, Goal, CalendarDays, ChartNoAxesCombined, CircleCheck, CodeXml, House, NotebookPen, ReceiptText, Refrigerator, Settings2, Wallet } from "lucide-react";
 import { modules } from "./modules";
 
 export const screens = {
@@ -12,5 +12,6 @@ export const screens = {
   knowledge: {title:modules.knowledge.title,icon:NotebookPen},
   learning: {title:modules.learning.title,icon:CodeXml},
   analytics: {title:modules.analytics.title,icon:ChartNoAxesCombined},
+  baseball: {title:"야구",icon:Goal},
   settings: {title:"설정",icon:Settings2},
 };

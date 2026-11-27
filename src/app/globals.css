@@ -189,3 +189,11 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .settlement-case > .button {justify-self:start}
 .settlement-case details summary {color:var(--accent);cursor:pointer}
 .finance-tabs [aria-pressed=true] {background:var(--tint);color:var(--accent);font-weight:700}
+
+.baseball-panels {display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr));margin-block:12px}
+.baseball-panels .panel,.baseball-booking .finance-heading {min-width:0}
+.baseball-panels li {flex-wrap:wrap}
+.baseball-link {color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-align:start;overflow-wrap:anywhere}
+.baseball-note {white-space:pre-wrap;overflow-wrap:anywhere}
+.baseball-booking {border-top:1px solid var(--line);margin-top:12px;padding:12px 0}
+.baseball-preview {max-height:240px;overflow:auto}

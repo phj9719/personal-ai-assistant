@@ -5,10 +5,11 @@ import { authenticatedUserId, authEnabled, signIn, signOut } from "@/auth";
 import { WorkspaceStorage } from "@/components/workspace-data";
 import { Workspace } from "@/components/workspace";
 import { screens } from "@/features/navigation";
+import { seoulNow } from "@/features/baseball/model";
 import { seoulDate } from "@/features/modules";
 import { Button } from "@/components/ui/button";
 
-export default async function Screen({params, searchParams}: {params:Promise<{screen:string}>,searchParams:Promise<{error?:string}>}) {
+export default async function Screen({params, searchParams}: {params:Promise<{screen:string}>,searchParams:Promise<{error?:string;game?:string}>}) {
   const {screen} = await params;
   if (screen === "login") {
     const {error} = await searchParams;
@@ -36,5 +37,6 @@ export default async function Screen({params, searchParams}: {params:Promise<{sc
     "use server";
     await signOut({redirectTo:"/login"});
   }}><Button variant="outline">로그아웃</Button></form> : null;
-  return <WorkspaceStorage remote={authEnabled}><Workspace demo={!authEnabled} screen={screen as keyof typeof screens} logout={logout} today={seoulDate()} /></WorkspaceStorage>;
+  const {game} = screen === "baseball" ? await searchParams : {};
+  return <WorkspaceStorage remote={authEnabled}><Workspace initialGame={game} initialNow={seoulNow(new Date())} demo={!authEnabled} screen={screen as keyof typeof screens} logout={logout} today={seoulDate()} /></WorkspaceStorage>;
 }

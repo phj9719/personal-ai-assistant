@@ -13,7 +13,7 @@ type Guard = (documents:Documents,changes:[Domain,unknown][])=>string;
 export class DocumentConstraint extends Error {}
 
 async function guardChanges(client:PoolClient,userId:string,changes:[Domain,unknown][],guard:Guard) {
-  if (!changes.some(([domain])=>domain==="records" || domain==="settlements")) return;
+  if (!changes.some(([domain])=>domain==="records" || domain==="settlements" || domain==="baseball")) return;
   const error = guard(await documentsFor(userId,client),changes);
   if (error) throw new DocumentConstraint(error);
 }

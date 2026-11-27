@@ -1,3 +1,4 @@
+import {baseballExpenses,initialBaseball,type Baseball} from "../baseball/model.ts";
 import {linkedIds,settlementFlows,type Settlements} from "../settlements/model.ts";
 import { effectiveScope, validDate, validMonth, type UtilityState } from "../utilities/model.ts";
 
@@ -111,10 +112,12 @@ export function estimateTotals(estimates:ReturnType<typeof expected>[]) {
   };
 }
 
-export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{id?:string;group:string;amount:number;date:string}[], utility:UtilityState, settlements:Settlements=[]) {
+export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{id?:string;group:string;amount:number;date:string}[], utility:UtilityState, settlements:Settlements=[], baseball:Baseball=initialBaseball) {
   const rows = monthly.filter(row=>row.month===month);
   const linked = linkedIds(settlements);
   const settlement = settlementFlows(settlements,month);
+  const baseballRows=baseballExpenses(baseball,month,settlements,ledger);
+  const baseballCost=add(baseballRows.map(row=>row.amount));
   const records = ledger.filter(row=>row.date.startsWith(month) && (!row.id || !linked.has(row.id)));
   const planned = rows.map(expected);
   const remaining = rows.filter(row=>row.paidOn===null).map(row=>outstanding(row,utility));
@@ -125,9 +128,9 @@ export function financeStatistics(month:string, monthly:Monthly[], transfers:Tra
     ...(purpose==="consumption" ? records.filter(row=>row.group==="지출").map(row=>row.amount) : []),
   ]);
   const ownExpenses=flow("consumption"), savings=flow("savings"), investment=flow("investment");
-  const consumption=add([ownExpenses,settlement.consumption]);
+  const consumption=add([ownExpenses,settlement.consumption,baseballCost]);
   const income=add(records.filter(row=>row.group==="수입").map(row=>row.amount));
-  const outflow=add([ownExpenses,savings,investment,settlement.outflow]);
+  const outflow=add([ownExpenses,savings,investment,settlement.outflow,...baseballRows.map(row=>row.cash)]);
   return {planned:estimateTotals(planned),remaining:estimateTotals(remaining),paid:add(paid.map(row=>row.paidAmount!)),
     consumption,savings,investment,income,outflow,refunds:settlement.refunds,balance:add([income,settlement.refunds,-outflow])};
 }
