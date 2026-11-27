@@ -24,3 +24,13 @@
 2. TASKS의 현재 단계만 구현하고 범위를 임의 확대하지 않는다. 설계 변경은 이유와 영향 범위를 보고한다.
 3. 변경 후 lint, typecheck, 테스트, build를 가능한 범위에서 실행하고 실제 결과를 기록한다. 실행하지 못한 검증은 명시한다.
 4. 완료한 작업만 체크하고 다음 작업을 제안한다. 실제 운영 배포는 사용자 승인 후 수행한다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

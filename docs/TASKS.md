@@ -1,6 +1,6 @@
 # 개발 작업 체크리스트
 
-기획 및 기본 설계 완료. 전체 기본 화면 → 실제 데이터 → AI 연동 → 배포 순으로 진행한다. 체크는 검증까지 완료한 경우만 한다.
+기본 설계와 가상 데이터 UI를 구현했다. 클라우드에서 Linux, Node.js 24, npm 11, Git 및 Docker Compose를 확인했다. Windows 집 PC와 실제 PostgreSQL·Ollama 검증은 남아 있다. 전체 기본 화면 → 실제 데이터 → AI 연동 → 배포 순으로 진행한다. 체크는 검증까지 완료한 경우만 한다.
 
 ## 0. 환경 확인
 - [ ] Windows, Node/npm, Git, VS Code, Docker/Compose, WSL, Codex 설치 확인
@@ -8,13 +8,15 @@
 - [ ] 호환되는 패키지 및 런타임 버전 결정
 
 ## 1. 프로젝트 초기화 및 전체 UI
-- [ ] Git 저장소, Next.js App Router + TypeScript + Tailwind, 공통 UI 설치
-- [ ] .gitignore, .env.example, lint/typecheck/test/build 스크립트
-- [ ] 공통 레이아웃, PC 사이드바, 모바일 하단 메뉴, 라이트/다크
-- [ ] 12개 화면 모두 생성, 가상 데이터 및 공통 CRUD 컴포넌트
-- [ ] PC/모바일 화면 확인 및 빌드
+- [x] Git 저장소, Next.js App Router + TypeScript + Tailwind, 공통 UI 설치
+- [x] .gitignore, .env.example, lint/typecheck/test/build 스크립트
+- [x] 공통 레이아웃, PC 사이드바, 모바일 하단 메뉴, 라이트/다크
+- [x] 12개 화면 모두 생성, 가상 데이터 및 공통 CRUD 컴포넌트
+- [x] PC/모바일 화면 확인 및 빌드
 
 ## 2. DB 및 인증
+
+PostgreSQL 초기 DDL, 데이터베이스 Compose 프로필, 환경 변수 계정의 Auth.js Credentials/JWT 구조를 작성했다. DB 연결 및 사용자 생성은 남아 있다.
 - [ ] 개발용 PostgreSQL Compose, 운영과 분리된 볼륨 및 계정
 - [ ] 기본 마이그레이션 20개 테이블(의존성 순서 및 검증 포함)
 - [ ] Auth.js 로그인, 최초 사용자 생성, 비밀번호 해시, 세션 보호
@@ -30,6 +32,8 @@
 - [ ] 전체 API·UI 정상 동작, 오류 및 빈 상태 확인
 
 ## 4. AI 비서
+
+Mock과 Ollama Provider를 구현했다. 채팅 세션과 명시적 기억은 브라우저에 저장하며, 기억을 모델에 주입하거나 업무 도구를 호출하는 기능은 남아 있다.
 - [ ] Provider 및 Ollama 연결, 모델 설정, 연결 오류 처리
 - [ ] 채팅방 및 이력 저장, 최근 문맥과 명시적 기억 관리
 - [ ] 도구 레지스트리, 읽기/쓰기 구분, 구조화 출력 검증

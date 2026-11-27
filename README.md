@@ -1,48 +1,47 @@
-# Personal AI Assistant
+# 온하루 · Personal AI Assistant
 
-개인 일정, 할 일, 가계부, 식품 재고, 공과금, 메모, 개발·학습, 생활 패턴을 채팅과 관리 화면으로 통합하는 개인 AI 비서 프로젝트.
+일정, 할 일, 가계부, 냉장고, 공과금, 메모, 개발·학습, 생활 분석을 채팅과 관리 화면에서 사용하는 개인 AI 비서입니다.
 
-## 상태
-2026-11-27 기준 기획·기본 설계 초안 완료. 소스코드 및 실행 환경은 아직 구축하지 않았다. 아래 실행 명령은 구현 후 목표 명령이며 지금은 실행할 수 없다.
+## 개발 실행
 
-## 환경
-Windows 집 PC (Ryzen 5 5600, RAM 16GB, RTX 4060 8GB, NVMe 512GB — 기존 제공 사양). Next.js/PostgreSQL은 Docker Compose 운영, Ollama는 Windows 직접 설치, 외부 접속은 Tailscale. 개발은 Windows에서 npm 개발 서버를 우선 고려한다.
+Node.js 24와 npm이 필요합니다.
 
-## 시작 전 확인 (PowerShell)
-```powershell
-code --version
-node -v
-npm -v
-git --version
-docker --version
-docker compose version
-wsl -l -v
-python --version
-codex --version
-ollama --version
+```sh
+npm ci
+npm run dev
 ```
-Ollama 설치: https://ollama.com/download/windows
-```powershell
-ollama run gemma3:4b
-# 채팅 종료: /bye
-ollama list
-ollama ps
+
+개발 서버 포트는 3000입니다. 기본 화면은 `/assistant`입니다. 기본 설정에서는 로그인 없이 Mock Provider를 사용합니다. 가상 레코드, 채팅 세션, 테마와 직접 저장한 기억은 브라우저에 보관됩니다. 브라우저 데이터를 지우면 초기 예시가 다시 표시됩니다. 다른 기기와 동기화되지 않으므로 실제 개인정보를 입력하지 마세요.
+
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
-`ollama ps`는 모델이 메모리에 로드된 동안 확인한다. 최종 모델은 한국어 및 기능 호출 테스트 후 선정한다.
 
-## 목표 실행 절차 (구현 후)
-1. `.env.example`을 참고하여 로컬 환경변수 파일 생성 (비밀값은 직접 설정).
-2. `npm ci` (lockfile 생성 이후), 개발용 DB 실행, 마이그레이션 및 최초 사용자 생성.
-3. `npm run dev` — 개발 포트 3000 제안.
-4. `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
-5. 운영은 `docker compose up -d --build` — 운영 포트 3001 제안. Tailscale HTTPS 연결 및 접근 정책 확인 후 사용.
+## 집 PC에서 실행
 
-## 문서
+Docker Desktop의 Linux 컨테이너 모드를 사용합니다. `.env.example`을 `.env`로 복사한 뒤 `docker compose up -d --build web`으로 시작합니다. 웹은 집 PC의 루프백 포트 3001에서 접속할 수 있습니다.
+
+- **PostgreSQL 초기화** — 로컬 `.env`에 개발용 `POSTGRES_PASSWORD`를 설정하고 `docker compose --profile database up -d db`를 실행합니다. 새 볼륨에서 [초기 마이그레이션](database/migrations/001_create_common.sql)이 실행됩니다. `docker compose exec db psql -U assistant -d assistant -c '\dt'`로 20개 테이블을 확인합니다. 초기화 SQL은 기존 볼륨에 다시 적용되지 않습니다. 앱의 CRUD는 현재 브라우저에 저장됩니다.
+- **Auth.js 로그인** — `DEMO_MODE=false`, 접속 주소에 맞는 `AUTH_URL`, 생성한 `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`를 설정합니다. `node -p "require('node:crypto').randomBytes(32).toString('base64url')"`로 비밀키를 생성합니다. 해시는 비밀번호를 표준 입력으로 전달해 `node scripts/password-hash.mjs`로 생성합니다. PowerShell에서는 아래 명령을 이용할 수 있습니다. 환경 변수 파일과 파일에 넣은 해시는 개인적으로 관리하세요. 인증은 단일 환경 변수 계정과 JWT 세션을 사용합니다.
+- **Ollama** — Windows에서 Ollama를 실행하고 `ollama pull gemma3:4b`를 실행합니다. 로그인 설정을 완료한 뒤 `AI_PROVIDER=ollama`와 `OLLAMA_MODEL=gemma3:4b`를 설정합니다. 웹을 Windows에서 직접 실행할 때는 `OLLAMA_BASE_URL=http://127.0.0.1:11434`를 사용합니다. Docker에서는 `http://host.docker.internal:11434`의 연결을 확인합니다. 연결이 안 되면 웹을 호스트에서 직접 실행해 먼저 검증하세요. Ollama와 PostgreSQL 포트는 외부에 공개하지 않습니다.
+- **원격 접속** — 집 PC에서 검증을 마친 뒤 Tailscale Serve의 HTTPS 주소와 접근 정책을 확인하고 인증 설정을 맞춥니다.
+
+PowerShell 7 이상에서 비밀번호 입력과 해시 생성 예시
+
+```powershell
+Read-Host "개발용 비밀번호" -MaskInput | node scripts/password-hash.mjs
+```
+
+Ollama Provider는 한국어 채팅에 응답합니다. 업무 데이터 조회와 변경, 채팅 기억의 모델 연동, DB 로그인, 운영 백업은 후속 작업입니다.
+
+## 설계 문서
+
 - [개발 지침](AGENTS.md)
 - [요구사항](docs/REQUIREMENTS.md)
 - [아키텍처](docs/ARCHITECTURE.md)
 - [DB 설계](docs/DATABASE.md)
 - [UI 설계](docs/UI_DESIGN.md)
 - [개발 작업](docs/TASKS.md)
-
-추가 AI API 비용 0원 목표. 전기료와 기존 ChatGPT 구독료는 별도이며 무료 소프트웨어·서비스 정책은 설치 시 확인한다. 집 PC가 꺼지면 서비스 사용 불가.
