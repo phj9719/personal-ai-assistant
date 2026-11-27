@@ -160,3 +160,18 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .import-dialog form,.import-preview {margin-top:12px}
 .import-preview ul {max-height:240px;overflow:auto;margin-block:10px}
 .import-preview li {display:grid;gap:4px;padding:8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+
+.finance-tabs {display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px}
+.finance-tabs button {padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer}
+.finance-tabs [aria-selected=true] {background:var(--tint);color:var(--accent);font-weight:700}
+.finance-title,.finance-heading {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.finance-heading {margin-bottom:10px}
+.finance-heading h2 {margin:0}
+.finance-fields,.finance-breakdown {display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.finance-fields label,.finance-fields input,.finance-fields select {min-width:0}
+.finance-stat-note {margin-bottom:16px}
+.finance-rows li {flex-wrap:wrap}
+.finance-rows li .row-actions {max-width:100%}
+@media (max-width:560px) {
+  .finance-fields,.finance-breakdown {grid-template-columns:minmax(0,1fr)}
+}

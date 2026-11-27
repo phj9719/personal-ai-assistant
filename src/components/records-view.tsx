@@ -19,13 +19,13 @@ function Stats({items}:{items:[string,string][]}) {
   return <div className="stats">{items.map(([name,value])=><div className="panel stat" key={name}><span>{name}</span><strong>{value}</strong></div>)}</div>;
 }
 
-export function Summary({records,today,housingCost}:{records:Records;today:string;housingCost:{total:number|null;complete:boolean}}) {
+export function Summary({records,today,housingCost,consumption}:{records:Records;today:string;consumption:number;housingCost:{total:number|null;complete:boolean}}) {
   const stats = summarize(records,today.slice(0,7));
   const due = records.schedule.filter(row=>row.date === today);
   return <>
     <h1>대시보드</h1><p className="muted">{today} · 가상 데이터</p>
     <Stats items={[
-      ["오늘 일정",`${due.length}건`],["남은 할 일",`${stats.open}건`],["이번 달 지출",`${number.format(stats.expense)}원`],
+      ["오늘 일정",`${due.length}건`],["남은 할 일",`${stats.open}건`],["이번 달 소비",`${number.format(consumption)}원`],
       ["재고 품목",`${records.inventory.length}개`],["이번 달 본인 주거비",housingCost.total===null ? "—" : `${number.format(housingCost.total)}원${housingCost.complete ? "" : " (확인분)"}`],["학습 기록",`${records.learning.filter(row=>row.group === "학습 기록").length}건`],
     ]}/>
     <section className="panel"><h2>오늘 일정</h2>{due.length ? <ul>{due.map(row=><li key={row.id}>{row.title}</li>)}</ul> : <p>등록된 일정이 없습니다.</p>}</section>
@@ -43,7 +43,7 @@ function TransactionsChart({ rows, groups }: {rows:Entry[];groups:readonly strin
   </ResponsiveContainer></section>;
 }
 
-export function RecordsView({module,records,today,theme,onChange}:{module:ModuleKey;records:Records;today:string;theme:"light"|"dark";onChange:(records:Records)=>void}) {
+export function RecordsView({module,records,today,theme,consumption,onChange}:{module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>void}) {
   const config = modules[module];
   const [query,setQuery] = useState("");
   const [group,setGroup] = useState("");
@@ -60,7 +60,7 @@ export function RecordsView({module,records,today,theme,onChange}:{module:Module
     <div className="page-title"><div><h1>{config.title}</h1><p className="muted">{config.description}</p></div>
     <Button onClick={()=>setEditing({id:"",title:"",group:group || config.groups[0],date:today,amount:0,detail:""})}><Plus size={18}/>추가</Button></div>
     {module === "finance" && <Stats items={[["수입",number.format(stats.income)+"원"],["지출",number.format(stats.expense)+"원"],["차액",number.format(stats.income-stats.expense)+"원"]]}/>}
-    {module === "analytics" && <Stats items={[["전체 활동 시간",stats.activity+"분"],["할 일 완료율",stats.completed+stats.open ? Math.round(100*stats.completed/(stats.completed+stats.open))+"%" : "0%"],["이번 달 지출",number.format(stats.expense)+"원"],["학습 기록",records.learning.filter(row=>row.group === "학습 기록").length+"건"]]}/>}
+    {module === "analytics" && <Stats items={[["전체 활동 시간",stats.activity+"분"],["할 일 완료율",stats.completed+stats.open ? Math.round(100*stats.completed/(stats.completed+stats.open))+"%" : "0%"],["이번 달 소비",number.format(consumption ?? stats.expense)+"원"],["학습 기록",records.learning.filter(row=>row.group === "학습 기록").length+"건"]]}/>}
     <div className={monthly ? "records-content with-chart" : "records-content"}>
       {monthly && <TransactionsChart rows={records[module]} groups={config.groups}/>}
       <section className="panel">
