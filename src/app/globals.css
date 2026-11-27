@@ -177,3 +177,15 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 }
 
 .workspace-data-notice {position:fixed;inset:auto 12px 74px auto;z-index:8;max-width:min(440px,calc(100% - 24px));display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 5px 20px #0002}
+
+.settlement-dialog {width:min(850px,calc(100% - 24px))}
+.settlement-fields,.settlement-inline {display:grid;gap:8px;min-width:0}
+.settlement-fields {border:1px solid var(--line);border-radius:10px;padding:12px}
+.settlement-fields legend {padding-inline:5px;font-weight:600}
+.settlement-inline {grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));align-items:end}
+.settlement-inline label {min-width:0}
+.settlement-inline input,.settlement-inline select {width:100%;min-width:0}
+.settlement-case {display:grid;gap:8px;overflow-wrap:anywhere}
+.settlement-case > .button {justify-self:start}
+.settlement-case details summary {color:var(--accent);cursor:pointer}
+.finance-tabs [aria-pressed=true] {background:var(--tint);color:var(--accent);font-weight:700}

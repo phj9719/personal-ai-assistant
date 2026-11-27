@@ -1,3 +1,4 @@
+import {linkedIds,settlementFlows,type Settlements} from "../settlements/model.ts";
 import { effectiveScope, validDate, validMonth, type UtilityState } from "../utilities/model.ts";
 
 export const purposes = { consumption:"일반 소비", savings:"저축", investment:"투자" } as const;
@@ -110,9 +111,11 @@ export function estimateTotals(estimates:ReturnType<typeof expected>[]) {
   };
 }
 
-export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{group:string;amount:number;date:string}[], utility:UtilityState) {
+export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{id?:string;group:string;amount:number;date:string}[], utility:UtilityState, settlements:Settlements=[]) {
   const rows = monthly.filter(row=>row.month===month);
-  const records = ledger.filter(row=>row.date.startsWith(month));
+  const linked = linkedIds(settlements);
+  const settlement = settlementFlows(settlements,month);
+  const records = ledger.filter(row=>row.date.startsWith(month) && (!row.id || !linked.has(row.id)));
   const planned = rows.map(expected);
   const remaining = rows.filter(row=>row.paidOn===null).map(row=>outstanding(row,utility));
   const paid = monthly.filter(row=>row.paidOn?.slice(0,7)===month && row.paidAmount!==null);
@@ -121,11 +124,12 @@ export function financeStatistics(month:string, monthly:Monthly[], transfers:Tra
     ...transfers.filter(row=>row.purpose===purpose && row.date.startsWith(month)).map(row=>row.amount),
     ...(purpose==="consumption" ? records.filter(row=>row.group==="지출").map(row=>row.amount) : []),
   ]);
-  const consumption=flow("consumption"), savings=flow("savings"), investment=flow("investment");
+  const ownExpenses=flow("consumption"), savings=flow("savings"), investment=flow("investment");
+  const consumption=add([ownExpenses,settlement.consumption]);
   const income=add(records.filter(row=>row.group==="수입").map(row=>row.amount));
-  const outflow=add([consumption,savings,investment]);
+  const outflow=add([ownExpenses,savings,investment,settlement.outflow]);
   return {planned:estimateTotals(planned),remaining:estimateTotals(remaining),paid:add(paid.map(row=>row.paidAmount!)),
-    consumption,savings,investment,income,outflow,balance:add([income,-outflow])};
+    consumption,savings,investment,income,outflow,refunds:settlement.refunds,balance:add([income,settlement.refunds,-outflow])};
 }
 
 export function readPeriod(start:string,end:string) {

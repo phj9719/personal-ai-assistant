@@ -11,7 +11,10 @@ import {
   methods, modes, outstanding, purposes, type Account, type FinanceState, type Monthly, type Payment, type Rule, type Transfer,
 } from "./model";
 
-const tabs = ["수입·지출 내역","고정 지출 관리","저축 및 투자","결제수단 관리","월별 통계"];
+import {SettlementsView} from "../settlements/view";
+import {cashPayments,linkedIds,type Settlements} from "../settlements/model";
+
+const tabs = ["수입·지출 내역","고정 지출 관리","저축 및 투자","결제수단 관리","월별 통계","정산·대납 관리"];
 const currency = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:2});
 const money = (amount:number|null)=>amount===null ? "미확인" : currency.format(amount)+"원";
 const estimate = ({amount,min,max}:ReturnType<typeof expected>)=>amount!==null ? money(amount) :
@@ -47,10 +50,11 @@ function MonthlyList({rows,accounts,utilities,onEdit}:{rows:Monthly[];accounts:A
   </li>)}</ul> : <p className="empty">생성된 월별 내역이 없습니다.</p>}</>;
 }
 
-function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities}:{
-  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;
+function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,settlements}:{
+  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;settlements:Settlements;
 }) {
-  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities);
+  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities,settlements);
+  const linked = linkedIds(settlements);
   const payments = new Map<string,number>();
   function addPayment(payment:Payment|null,amount:number) {
     const name = payment ? paymentLabel(payment,accounts) : "결제수단 미지정 · 일반 거래";
@@ -58,7 +62,11 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities}:
   }
   monthly.filter(row=>row.paidOn?.slice(0,7)===month && row.paidAmount!==null).forEach(row=>addPayment(row.payment,row.paidAmount!));
   transfers.filter(row=>row.date.startsWith(month)).forEach(row=>addPayment(row.payment,row.amount));
-  records.finance.filter(row=>row.group==="지출" && row.date.startsWith(month)).forEach(row=>addPayment(null,row.amount));
+  records.finance.filter(row=>row.group==="지출" && row.date.startsWith(month) && !linked.has(row.id)).forEach(row=>addPayment(null,row.amount));
+  for (const row of cashPayments(settlements,month)) {
+    const label = row.account ? "정산·대납 · "+row.account : "정산·대납 · 결제수단 미지정";
+    payments.set(label,(payments.get(label) ?? 0)+row.amount*100);
+  }
   const dates = new Map<string,ReturnType<typeof expected>[]>();
   for (const row of monthly.filter(row=>row.month===month && row.paidOn===null)) {
     const label = row.due ? row.due+(row.timing==="approximate" ? "경" : "") : "미지정";
@@ -70,9 +78,9 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities}:
       ["예상 고정 지출",estimateTotal(stats.planned)],["실제 고정 지출 납부액",money(stats.paid)],
       ["남은 납부 예정액",estimateTotal(stats.remaining)],["일반 소비",money(stats.consumption)],
       ["저축",money(stats.savings)],["투자",money(stats.investment)],["전체 자금 유출",money(stats.outflow)],
-      ["월 수입",money(stats.income)],["월 수입 대비 남은 자금",money(stats.balance)],
+      ["월 수입",money(stats.income)],["정산·대납 회수금",money(stats.refunds)],["월 수입 대비 남은 자금",money(stats.balance)],
     ]}/>
-    <p className="muted finance-stat-note">예정액은 청구월, 실제 지출은 납부일 기준입니다. 남은 자금은 월 수입에서 실제 자금 유출을 뺀 금액입니다.</p>
+    <p className="muted finance-stat-note">예정액은 청구월, 실제 지출은 납부일 기준입니다. 남은 자금은 월 수입과 정산·대납 회수금에서 실제 자금 유출을 뺀 금액입니다.</p>
     <div className="finance-breakdown">
       <section className="panel"><h2>결제수단별 실제 유출</h2>
         {payments.size ? <ul className="rows">{[...payments].map(([name,cents])=><li key={name}><span>{name}</span><strong>{money(cents/100)}</strong></li>)}</ul> : <p className="empty">실제 유출 내역이 없습니다.</p>}
@@ -87,8 +95,8 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities}:
 type Editor = {kind:"rule";rule?:Rule} | {kind:"account";account?:Account} | {kind:"transfer";transfer?:Transfer} | {kind:"monthly";row:Monthly};
 type Removal = {kind:"rule"|"account"|"transfer";id:string};
 
-export function FinanceView({state,save,records,updateRecords,utilities,today,theme}:{
-  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
+export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements}:{
+  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
 }) {
   const [tab,setTab] = useState(0);
   const [month,setMonth] = useState(today.slice(0,7));
@@ -116,9 +124,10 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
     </div>
     <section role="tabpanel" id="finance-panel" aria-labelledby={"finance-tab-"+tab}>
       {tab===0 ? <>
-        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords}/>
-        <p className="muted">이 탭에는 직접 등록한 거래가 표시됩니다. 고정 지출과 저축·투자의 실제 금액은 월별 통계에서 함께 확인할 수 있습니다.</p>
-      </> : <>
+        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords} linked={linkedIds(settlements)}/>
+        <p className="muted">이 탭에는 원본 거래금액이 표시됩니다. 본인 소비와 실제 자금 유출은 월별 통계에서 확인할 수 있습니다.</p>
+      </> : tab===5 ? <SettlementsView cases={settlements} save={saveSettlements} ledger={records.finance}
+        accounts={state.accounts.filter(account=>!account.archived).map(account=>account.institution+" · "+account.name)} today={today}/> : <>
         <div className="page-title finance-title">
           <h1>{tabs[tab]}</h1>
           {tab!==3 && <label>조회 월<input aria-label="조회 월" type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label>}
@@ -166,7 +175,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
               <Button variant="ghost" aria-label={account.name+" 보관"} onClick={()=>setRemoving({kind:"account",id:account.id})}>보관</Button></div>
           </li>)}</ul>
         </section>}
-        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities}/> :
+        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements}/> :
           <p className="empty">조회 월을 선택해 주세요.</p>)}
       </>}
     </section>

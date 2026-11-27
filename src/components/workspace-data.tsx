@@ -93,7 +93,7 @@ export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceDa
 const labels:Record<Domain,string> = {
   records:"일정·할 일·가계부 거래·재고·메모·개발·생활 기록",
   utilities:"거주 기간 및 공과금",finance:"고정 지출·저축·투자·결제수단",
-  chat:"채팅 세션과 메시지",memories:"AI 기억",theme:"테마",
+  settlements:"정산·대납 및 입금",chat:"채팅 세션과 메시지",memories:"AI 기억",theme:"테마",
 };
 
 function browserData() {

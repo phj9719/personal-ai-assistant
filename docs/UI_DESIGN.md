@@ -20,3 +20,5 @@ ChatGPT 유사 채팅 중심. 기본 진입 `/assistant`. PC 왼쪽 사이드바
 공통 컴포넌트: AppLayout, Sidebar, MobileNav, Header, PageHeader, DataTable, SearchFilter, FormDialog, ConfirmDialog, StatCard, ChatMessage, ChatInput, Loading, EmptyState, Toast. 모바일 표는 카드 또는 가로 스크롤로 대응. 키보드 접근성, 포커스, 오류 안내 포함.
 
 초기 모든 화면은 가상 데이터로 먼저 구현하되 실제 데이터와 명확히 구분한다. 기능 연결 후 미구현 버튼은 비활성화/표시하고 성공한 것처럼 보이지 않게 한다. 파일 첨부·마이크·고급 알림은 후속이다. 화면 디자인과 입력 항목은 실사용하며 수정한다.
+
+가계부의 **정산·대납 관리** 탭에서 일반 정산, 대납금 관리, 입금 이력, 미수금 현황을 전환한다. 결제·참석자·상환 회차 입력은 좁은 화면에서 한 열로 줄어든다. 대시보드는 전체 미수금과 이번 달 예정 입금액을 표시한다.

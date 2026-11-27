@@ -19,12 +19,13 @@ function Stats({items}:{items:[string,string][]}) {
   return <div className="stats">{items.map(([name,value])=><div className="panel stat" key={name}><span>{name}</span><strong>{value}</strong></div>)}</div>;
 }
 
-export function Summary({records,today,housingCost,consumption}:{records:Records;today:string;consumption:number;housingCost:{total:number|null;complete:boolean}}) {
+export function Summary({records,today,housingCost,consumption,receivables,demo}:{demo:boolean;receivables:{balance:number;scheduled:number;unknownScheduled:number};records:Records;today:string;consumption:number;housingCost:{total:number|null;complete:boolean}}) {
   const stats = summarize(records,today.slice(0,7));
   const due = records.schedule.filter(row=>row.date === today);
   return <>
-    <h1>대시보드</h1><p className="muted">{today} · 가상 데이터</p>
+    <h1>대시보드</h1><p className="muted">{today}{demo ? " · 가상 데이터" : ""}</p>
     <Stats items={[
+      ["전체 미수금",number.format(receivables.balance)+"원"],["이번 달 입금 예정",number.format(receivables.scheduled)+"원"+(receivables.unknownScheduled ? " + 미정 "+receivables.unknownScheduled+"건" : "")],
       ["오늘 일정",`${due.length}건`],["남은 할 일",`${stats.open}건`],["이번 달 소비",`${number.format(consumption)}원`],
       ["재고 품목",`${records.inventory.length}개`],["이번 달 본인 주거비",housingCost.total===null ? "—" : `${number.format(housingCost.total)}원${housingCost.complete ? "" : " (확인분)"}`],["학습 기록",`${records.learning.filter(row=>row.group === "학습 기록").length}건`],
     ]}/>
@@ -43,7 +44,7 @@ function TransactionsChart({ rows, groups }: {rows:Entry[];groups:readonly strin
   </ResponsiveContainer></section>;
 }
 
-export function RecordsView({module,records,today,theme,consumption,onChange}:{module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
+export function RecordsView({module,records,today,theme,consumption,onChange,linked}:{linked?:Set<string>;module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
   const config = modules[module];
   const [query,setQuery] = useState("");
   const [group,setGroup] = useState("");
@@ -85,10 +86,10 @@ export function RecordsView({module,records,today,theme,consumption,onChange}:{m
           />
         </div>}
         {rows.length ? <ul className="rows">{rows.map(row=><li key={row.id}>
-          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}</div>
+          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}{linked?.has(row.id) && <p>정산·대납에 연결됨 · 연결 해제 후 수정·삭제할 수 있습니다.</p>}</div>
           <div className="row-actions">{module === "tasks" && row.group !== "완료" && <Button variant="outline" onClick={()=>replace(records[module].map(item=>item.id === row.id ? {...item,group:"완료"} : item))}>완료</Button>}
-          <Button variant="ghost" aria-label={row.title+" 수정"} onClick={()=>setEditing(row)}><Pencil size={17}/></Button>
-          <Button variant="ghost" aria-label={row.title+" 삭제"} onClick={()=>setDeleting(row)}><Trash2 size={17}/></Button></div>
+          <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 수정"} onClick={()=>setEditing(row)}><Pencil size={17}/></Button>
+          <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 삭제"} onClick={()=>setDeleting(row)}><Trash2 size={17}/></Button></div>
         </li>)}</ul> : <p className="empty">표시할 항목이 없습니다.</p>}
       </section>
     </div>
