@@ -7,6 +7,8 @@ import { screens } from "@/features/navigation";
 import { sampleRecords, type Records } from "@/features/modules";
 import { RecordsView, Summary } from "./records-view";
 import { Chat } from "./chat";
+import { UtilitiesView } from "@/features/utilities/view";
+import { comparison, sampleUtilities } from "@/features/utilities/model";
 import { Button } from "./ui/button";
 
 import {useLocal} from "./use-local";
@@ -16,6 +18,7 @@ const main = ["assistant","dashboard","schedule","tasks"] as const;
 
 export function Workspace({ screen, today, logout }: {screen:Screen; today:string; logout:React.ReactNode}) {
   const [records, save] = useLocal<Records>("onharu-records-v1", sampleRecords(today));
+  const [utilities, saveUtilities] = useLocal("onharu-utilities-v1", sampleUtilities(today));
   const [theme, setTheme] = useLocal<"light"|"dark">("onharu-theme-v1","light");
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
@@ -32,8 +35,8 @@ export function Workspace({ screen, today, logout }: {screen:Screen; today:strin
     </aside>
     <div className="content">
       <header><span>{screens[screen].title}</span><Button variant="ghost" aria-label={theme === "light" ? "다크 모드" : "라이트 모드"} onClick={toggle}>{theme === "light" ? <Moon size={19}/> : <Sun size={19}/>}</Button></header>
-      <main className="page">
-        {screen === "assistant" ? <Chat/> : screen === "settings" ? <Settings theme={theme} setTheme={setTheme} logout={logout}/> : screen === "dashboard" ? <Summary records={records} today={today}/> : <RecordsView key={screen} module={screen} records={records} today={today} onChange={save}/>}
+      <main className={screen === "assistant" || screen === "settings" ? "page" : "page page-wide"}>
+        {screen === "assistant" ? <Chat/> : screen === "settings" ? <Settings theme={theme} setTheme={setTheme} logout={logout}/> : screen === "dashboard" ? <Summary records={records} today={today} housingCost={comparison(utilities.bills,today.slice(0,7),utilities.residence,false)}/> : screen === "utilities" ? <UtilitiesView state={utilities} save={saveUtilities} today={today} legacy={records.utilities}/> : <RecordsView key={screen} module={screen} records={records} today={today} theme={theme} onChange={save}/>}
       </main>
     </div>
     <nav className="mobile" aria-label="빠른 메뉴">{main.map(link)}<button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><Menu size={19}/>전체</button></nav>
