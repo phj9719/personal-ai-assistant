@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RecordsView } from "@/components/records-view";
 import type { Records } from "../modules";
 import { validMonth, type UtilityState } from "../utilities/model";
+import { monthlyDeletionBlock, monthlyDeletionTargets, monthlyKey, type MonthlyDeletion } from "./monthly-deletion";
 import { AccountForm, MonthlyForm, RuleForm, TransferForm } from "./forms";
 import {
   accountLabel, accountSuggestions, createMonth, estimateTotals, expected, financeStatistics, invoice, links,
@@ -39,7 +40,7 @@ function StatCards({items}:{items:[string,string][]}) {
   return <div className="stats">{items.map(([label,value])=><div className="panel stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>;
 }
 
-function MonthlyList({rows,accounts,utilities,onEdit}:{rows:Monthly[];accounts:Account[];utilities:UtilityState;onEdit:(row:Monthly)=>void}) {
+function MonthlyList({rows,accounts,utilities,onEdit,onDelete}:{rows:Monthly[];accounts:Account[];utilities:UtilityState;onEdit:(row:Monthly)=>void;onDelete:(row:Monthly)=>void}) {
   return <>{rows.length ? <ul className="rows finance-rows">{rows.map(row=><li key={row.ruleId}>
     <div>
       <strong>{row.title}</strong>
@@ -49,7 +50,10 @@ function MonthlyList({rows,accounts,utilities,onEdit}:{rows:Monthly[];accounts:A
       {row.utility && <p>{links[row.utility]} 고지액 {money(invoice(row,utilities))}</p>}
       {row.paidOn && <p>실제 납부 {row.paidOn} · {money(row.paidAmount)}</p>}
     </div>
-    <Button variant="outline" onClick={()=>onEdit(row)} aria-label={row.title+" 납부 내역 수정"}>납부 내역</Button>
+    <div className="row-actions">
+      <Button variant="outline" onClick={()=>onEdit(row)} aria-label={row.title+" 납부 내역 수정"}>납부 내역</Button>
+      <Button variant="ghost" onClick={()=>onDelete(row)} aria-label={row.title+" 월별 내역 삭제"}>삭제</Button>
+    </div>
   </li>)}</ul> : <p className="empty">생성된 월별 내역이 없습니다.</p>}</>;
 }
 
@@ -113,14 +117,21 @@ type Editor = {kind:"rule";rule?:Rule} | {kind:"account";account?:Account} | {ki
 type Removal = {kind:"rule"|"account"|"transfer";id:string};
 
 export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements,baseball,subscriptions,saveSubscriptions,initialTab}:{initialTab?:number;
-  subscriptions:Subscriptions;saveSubscriptions:(state:Subscriptions)=>Promise<boolean>;state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;baseball:Baseball;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
+  subscriptions:Subscriptions;saveSubscriptions:(state:Subscriptions)=>Promise<boolean>;state:FinanceState;save:(state:FinanceState,deletion?:MonthlyDeletion)=>Promise<boolean>;baseball:Baseball;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
 }) {
   const [tab,setTab] = useState(initialTab ?? 0);
   const [month,setMonth] = useState(today.slice(0,7));
   const [editing,setEditing] = useState<Editor|null>(null);
   const [removing,setRemoving] = useState<Removal|null>(null);
+  const [removingMonthly,setRemovingMonthly] = useState<MonthlyDeletion|null>(null);
   const [status,setStatus] = useState("");
   const rows = state.monthly.filter(row=>row.month===month);
+  const bulkTarget:MonthlyDeletion = {mode:"unpaid",month};
+  const unpaid = monthlyDeletionTargets(rows,bulkTarget);
+  const selectedForRemoval = removingMonthly ? monthlyDeletionTargets(state.monthly,removingMonthly) : [];
+  const single = removingMonthly?.mode==="single" ? selectedForRemoval[0] : undefined;
+  const paid = !!single && single.paidOn!==null;
+  const block = single ? monthlyDeletionBlock(single,subscriptions) : "";
   const transfers = state.transfers.filter(row=>row.date.startsWith(month));
   const settledSaving = state.monthly.filter(row=>row.purpose!=="consumption" && row.paidOn?.slice(0,7)===month);
   const close = ()=>setEditing(null);
@@ -156,13 +167,17 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
         {status && <p role="status" className="utility-status">{status}</p>}
         {tab===1 && <>
           <section className="panel">
-            <div className="finance-heading"><h2>월별 예정·납부 내역</h2><Button disabled={!validMonth(month)} onClick={async ()=>{
-              const monthly = createMonth(state.rules.filter(rule=>!subscriptions.services.some(row=>row.ruleId===rule.id)),state.monthly,month);
-              const added = monthly.length-state.monthly.length;
-              if (added && !await save({...state,monthly})) return;
-              setStatus(added ? added+"건의 예정 내역을 생성했습니다." : "새로 생성할 예정 내역이 없습니다.");
-            }}>이 달 예정 내역 생성</Button></div>
-            <MonthlyList rows={rows} accounts={state.accounts} utilities={utilities} onEdit={row=>setEditing({kind:"monthly",row})}/>
+            <div className="finance-heading"><h2>월별 예정·납부 내역</h2><div className="row-actions">
+              <Button disabled={!validMonth(month)} onClick={async ()=>{
+                const monthly = createMonth(state.rules.filter(rule=>!subscriptions.services.some(row=>row.ruleId===rule.id)),state.monthly,month);
+                const added = monthly.length-state.monthly.length;
+                if (added && !await save({...state,monthly})) return;
+                setStatus(added ? added+"건의 예정 내역을 생성했습니다." : "새로 생성할 예정 내역이 없습니다.");
+              }}>이 달 예정 내역 생성</Button>
+              <Button variant="outline" disabled={!unpaid.length} onClick={()=>setRemovingMonthly(bulkTarget)}>이달 예정 내역 삭제</Button>
+            </div></div>
+            <MonthlyList rows={rows} accounts={state.accounts} utilities={utilities} onEdit={row=>setEditing({kind:"monthly",row})}
+              onDelete={row=>setRemovingMonthly({mode:"single",month:row.month,ruleId:row.ruleId})}/>
           </section>
           <section className="panel">
             <div className="finance-heading"><h2>반복 지출 설정</h2><Button onClick={()=>setEditing({kind:"rule"})}>고정 지출 등록</Button></div>
@@ -215,6 +230,33 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
     {editing?.kind==="monthly" && <MonthlyForm row={editing.row} accounts={state.accounts} today={today} onClose={close} onSave={async row=>{
       if (await save({...state,monthly:state.monthly.map(item=>item.ruleId===row.ruleId && item.month===row.month ? row : item)})) close();
     }}/>}
+    {removingMonthly && <dialog ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setRemovingMonthly(null)} className="dialog" aria-labelledby="monthly-remove-title">
+      <h2 id="monthly-remove-title">{removingMonthly.mode==="unpaid" ? "이달 예정 내역 삭제" : "월별 내역 삭제"}</h2>
+      <form onSubmit={async event=>{
+        event.preventDefault();
+        if (!selectedForRemoval.length || block) return;
+        const confirmPaid = new FormData(event.currentTarget).has("confirmPaid");
+        if (paid && !confirmPaid) return;
+        const target = removingMonthly.mode==="single" && confirmPaid ? {...removingMonthly,confirmPaid:true as const} : removingMonthly;
+        const keys = new Set(selectedForRemoval.map(monthlyKey));
+        if (await save({...state,monthly:state.monthly.filter(row=>!keys.has(monthlyKey(row)))},target)) {
+          setStatus(selectedForRemoval.length+"건의 월별 내역을 삭제했습니다.");
+        }
+        setRemovingMonthly(null);
+      }}>
+        {!selectedForRemoval.length ? <p>삭제할 월별 내역이 없습니다.</p> : single
+          ? <p>{single.month} · {single.title} 내역을 삭제할까요?</p>
+          : <p>{removingMonthly.month} 미납 예정 내역 {selectedForRemoval.length}건을 삭제할까요?</p>}
+        {block ? <p role="alert" className="alert">{block}</p> : <>
+          <p className="muted">원본 고정 지출 설정은 유지됩니다.</p>
+          {single && paid && <label><input type="checkbox" name="confirmPaid" required/>삭제하면 {single.paidOn}에 기록된 {money(single.paidAmount)}이 가계부 실제 지출 집계에서 빠지는 것을 확인했습니다.</label>}
+        </>}
+        <div className="row-actions">
+          <Button type="button" variant="outline" onClick={()=>setRemovingMonthly(null)}>{block ? "닫기" : "취소"}</Button>
+          {!block && <Button type="submit" disabled={!selectedForRemoval.length}>삭제</Button>}
+        </div>
+      </form>
+    </dialog>}
     {removing && <dialog ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setRemoving(null)} className="dialog" aria-labelledby="finance-remove-title">
       <h2 id="finance-remove-title">{removing.kind==="account" ? "결제수단 보관" : "내역 삭제"}</h2>
       <p>{removing.kind==="transfer" ? "선택한 이체 내역을 삭제할까요?" : "이미 생성된 월별 내역과 납부 기록은 보존됩니다."}</p>

@@ -4,6 +4,7 @@ import {createContext,useCallback,useContext,useEffect,useRef,useState,type Reac
 import {browserKeys,domains,emptyData,type Documents,type Domain,type WorkspaceData} from "@/features/workspace/data";
 import type {ChatAction} from "@/features/workspace/chat";
 import type {ChatSession} from "@/features/workspace/data";
+import type {MonthlyDeletion} from "@/features/finance/monthly-deletion";
 import {hasOutsideResidenceBills} from "@/features/utilities/model";
 import {Button} from "./ui/button";
 import {useLocal} from "./use-local";
@@ -75,7 +76,7 @@ export function WorkspaceStorage({remote,children}:{remote:boolean;children:Reac
   </StorageContext.Provider>;
 }
 
-export type Save<T> = (value:T,confirmedOutsideResidence?:boolean)=>Promise<boolean>;
+export type Save<T> = (value:T,confirmation?:boolean|MonthlyDeletion)=>Promise<boolean>;
 
 export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceData[K]):readonly [WorkspaceData[K],Save<WorkspaceData[K]>] {
   const remote = useContext(StorageContext);
@@ -83,9 +84,9 @@ export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceDa
   const document = remote?.documents[domain];
   const value = remote ? (document ? document.value as WorkspaceData[K] : emptyData[domain]) : local;
   let revision = document?.revision ?? 0;
-  return [value,async (next,confirmedOutsideResidence)=>{
+  return [value,async (next,confirmation)=>{
     if (remote) {
-      const saved = await remote.write({domain,revision,value:next,confirmedOutsideResidence:confirmedOutsideResidence ? true : undefined});
+      const saved = await remote.write({domain,revision,value:next,confirmedOutsideResidence:confirmation===true ? true : undefined,monthlyDeletion:typeof confirmation==="object" ? confirmation : undefined});
       if (saved) revision++;
       return saved;
     }

@@ -1,3 +1,4 @@
+import {validateMonthlyDeletion,type MonthlyDeletion} from "../features/finance/monthly-deletion";
 import {needsResidenceConfirmation,type UtilityState} from "../features/utilities/model";
 import {subscriptionHistoryError,subscriptionLinks} from "../features/subscriptions/links";
 import {chatAction} from "../features/workspace/chat";
@@ -49,26 +50,33 @@ async function persist(userId:string,body:unknown) {
   if (domain==="chat") return {status:400,error:"채팅 기록은 채팅 작업 요청으로 관리합니다."} as const;
   const document = parseDocument(domain,value);
   if (!document.success) return {status:400,error:"유효하지 않거나 중복된 데이터가 있습니다."} as const;
-  const saved = await writeDocument(userId,domain,revision,document.data,workspaceGuard(update.data.confirmedOutsideResidence));
+  const guard = workspaceGuard(update.data.confirmedOutsideResidence,update.data.monthlyDeletion);
+  const saved = await writeDocument(userId,domain,revision,document.data,(current,changes)=>
+    (current[domain]?.revision ?? 0)===revision ? guard(current,changes) : "");
   return saved ? {status:200,documents:{[domain]:saved}} as const :
     {status:409,error:"다른 탭에서 데이터가 변경되었습니다. 최신 데이터를 불러왔으니 확인 후 다시 시도해 주세요."} as const;
 }
 
-function workspaceGuard(confirmedOutsideResidence?:true) {
+function workspaceGuard(confirmedOutsideResidence?:true,monthlyDeletion?:MonthlyDeletion) {
   return (current:Documents,changes:[Domain,unknown][])=>{
     const utility = changes.find(([domain])=>domain==="utilities")?.[1] as UtilityState|undefined;
     if (utility && !confirmedOutsideResidence && needsResidenceConfirmation(current.utilities?.value as UtilityState|undefined,utility)) {
       return "거주 기간과 겹치지 않는 청구가 있습니다. 실제 관리비로 저장하려면 확인해 주세요.";
     }
-    return guardWorkspace(current,changes);
+    return guardWorkspace(current,changes,monthlyDeletion);
   };
 }
 
-function guardWorkspace(current:Documents,changes:[Domain,unknown][]) {
+function guardWorkspace(current:Documents,changes:[Domain,unknown][],monthlyDeletion?:MonthlyDeletion) {
   const issue=settlementGuard(current,changes) || baseballGuard(current,changes);
   if (issue) return issue;
   const updates=new Map(changes);
   const get=<K extends Domain>(key:K)=>(updates.get(key) ?? current[key]?.value ?? emptyData[key]) as WorkspaceData[K];
+  if (updates.has("finance")) {
+    const finance = (current.finance?.value ?? emptyData.finance) as WorkspaceData["finance"];
+    const removalIssue = validateMonthlyDeletion(finance.monthly,get("finance").monthly,get("subscriptions"),monthlyDeletion);
+    if (removalIssue) return removalIssue;
+  }
   const previous=(current.subscriptions?.value ?? emptyData.subscriptions) as WorkspaceData["subscriptions"];
   return subscriptionHistoryError(previous,get("subscriptions")) || subscriptionLinks(get("subscriptions"),get("records").finance,get("finance"),get("settlements"),get("baseball"));
 }

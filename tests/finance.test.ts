@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createMonth, expected, financeStatistics, initialFinance, invoice, outstanding, readPeriod, validateRule, type Rule, type Transfer} from "../src/features/finance/model.ts";
+import {monthlyDeletionTargets,validateMonthlyDeletion,type MonthlyDeletion} from "../src/features/finance/monthly-deletion.ts";
+import {initialSubscriptions,newPayment,type Subscription} from "../src/features/subscriptions/model.ts";
 import {blankBill, type UtilityState} from "../src/features/utilities/model.ts";
 
 const today = "2024-02-16";
@@ -21,6 +23,52 @@ test("generates one snapshot per rule and month, including leap-month due dates"
   assert.equal(createMonth([{...fixed,archived:true}],[original],"2024-03").length,1);
   assert.equal(createMonth([{...fixed,active:false}],[],"2024-02").length,0);
   assert.equal(createMonth([{...fixed,end:"2024-01-31"}],[],"2024-02").length,0);
+});
+
+test("deletes only the selected month's unpaid snapshots and regenerates from current rules",()=>{
+  const fixed = rule();
+  const second = rule({id:"second"});
+  const paid = {...createMonth([second],[],"2024-02")[0],paidOn:"2024-02-19",paidAmount:12000};
+  const rows = createMonth([fixed,second],createMonth([fixed],[paid],"2024-01"),"2024-02");
+  const target = {mode:"unpaid",month:"2024-02"} as const;
+  const kept = rows.slice(0,2);
+  assert.deepEqual(monthlyDeletionTargets(rows,target),[rows[2]]);
+  assert.equal(validateMonthlyDeletion(rows,kept,initialSubscriptions,target),"");
+  assert.notEqual(validateMonthlyDeletion(rows,kept,initialSubscriptions),"");
+  assert.notEqual(validateMonthlyDeletion(rows,[],initialSubscriptions,target),"");
+  assert.notEqual(validateMonthlyDeletion(rows,[rows[1]],initialSubscriptions,target),"");
+  assert.deepEqual(financeStatistics("2024-02",kept,[],[],housing).remaining,{min:0,max:0,unknown:0});
+  assert.equal(financeStatistics("2024-02",kept,[],[],housing).paid,12000);
+
+  const changed = {...fixed,title:"변경된 고정비",quote:{...fixed.quote,amount:31000}};
+  const recreated = createMonth([changed,second],kept,"2024-02");
+  assert.deepEqual(recreated.slice(0,2),kept);
+  assert.equal(recreated[2].title,changed.title);
+  assert.equal(recreated[2].quote.amount,31000);
+  assert.equal(createMonth([changed,second],recreated,"2024-02").length,recreated.length);
+});
+
+test("requires distinct acknowledgement for paid rows and protects a linked subscription payment",()=>{
+  const fixed = rule();
+  const rows = createMonth([fixed],createMonth([fixed],[],"2024-01"),"2024-02");
+  const paid = {...rows[1],paidOn:"2024-02-19",paidAmount:12000};
+  const target:MonthlyDeletion = {mode:"single",month:paid.month,ruleId:paid.ruleId};
+  const confirmed:MonthlyDeletion = {...target,confirmPaid:true};
+  const all = [rows[0],paid];
+  assert.notEqual(validateMonthlyDeletion(all,[rows[0]],initialSubscriptions,target),"");
+  assert.equal(validateMonthlyDeletion(all,[rows[0]],initialSubscriptions,confirmed),"");
+  assert.notEqual(validateMonthlyDeletion(all,[paid],initialSubscriptions,confirmed),"");
+  assert.equal(validateMonthlyDeletion(rows,[rows[0]],initialSubscriptions,target),"");
+  const service = {id:"fixture-service",amount:12000,currency:"KRW"} as Subscription;
+  const tied = {...newPayment(service,paid.paidOn,"fixture-payment"),state:"paid" as const,
+    paidOn:paid.paidOn,amount:paid.paidAmount,actualCurrency:"KRW" as const,fixedRuleId:paid.ruleId,fixedMonth:paid.month};
+  const subscription = {...initialSubscriptions,payments:[tied]};
+  assert.match(validateMonthlyDeletion(all,[rows[0]],subscription,confirmed),/구독 결제 이력에 연결/);
+  assert.equal(validateMonthlyDeletion(all,[rows[0]],{...subscription,payments:[{...tied,fixedRuleId:null,fixedMonth:null}]},confirmed),"");
+
+  const zeroPaid = {...paid,paidAmount:0};
+  assert.equal(monthlyDeletionTargets([zeroPaid],{mode:"unpaid",month:zeroPaid.month}).length,0);
+  assert.notEqual(validateMonthlyDeletion([zeroPaid],[],initialSubscriptions,target),"");
 });
 
 test("supports variable ranges, optional schedules and inclusive daily periods",()=>{

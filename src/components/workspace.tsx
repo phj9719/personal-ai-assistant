@@ -78,7 +78,7 @@ export function Workspace({ screen, today, logout, demo, initialGame, initialNow
             accounts={accountSuggestions(finance.accounts)} initialNow={initialNow} theme={theme} initialSelected={initialGame}/> :
           screen === "finance" ? <FinanceView key={initialFinanceTab} initialTab={initialFinanceTab} subscriptions={subscriptions} saveSubscriptions={saveSubscriptions} baseball={baseball} settlements={settlements} saveSettlements={async next=>{
             return guard(baseballLinks(baseball,records.finance,next) || subscriptionLinks(subscriptions,records.finance,finance,next,baseball)) && await saveSettlements(next);
-          }} state={finance} save={async next=>guard(subscriptionLinks(subscriptions,records.finance,next,settlements,baseball)) && await saveFinance(next)}
+          }} state={finance} save={async (next,deletion)=>guard(subscriptionLinks(subscriptions,records.finance,next,settlements,baseball)) && await saveFinance(next,deletion)}
             records={records} updateRecords={async next=>guard(subscriptionLinks(subscriptions,next.finance,finance,settlements,baseball)) && await save(next)} utilities={utilities} today={today} theme={theme}/> :
           <>
             <RecordsView key={screen} module={screen} records={records} today={today} theme={theme} consumption={consumption} onChange={save}

@@ -80,6 +80,19 @@ test("requires explicit import confirmation and rejects a client-supplied owner"
   assert.equal(parseDocument("chat",[{id:"demo",title:"가상 예시",messages:[{role:"system",content:"invalid"}]}]).success,false);
 });
 
+test("accepts only scoped monthly deletion confirmations for finance writes",()=>{
+  const base = {domain:"finance",revision:1,value:initialFinance(today)};
+  assert.ok(writeRequest.safeParse({...base,monthlyDeletion:{mode:"unpaid",month:"2026-11"}}).success);
+  assert.ok(writeRequest.safeParse({...base,monthlyDeletion:{mode:"single",month:"2026-11",ruleId:"fixture",confirmPaid:true}}).success);
+  for (const monthlyDeletion of [
+    {mode:"unpaid",month:"2026-11",confirmPaid:true},
+    {mode:"unpaid",month:"2026-13"},
+    {mode:"single",month:"2026-11"},
+    {mode:"single",month:"2026-11",ruleId:""},
+  ]) assert.equal(writeRequest.safeParse({...base,monthlyDeletion}).success,false);
+  assert.equal(writeRequest.safeParse({...base,domain:"records",monthlyDeletion:{mode:"unpaid",month:"2026-11"}}).success,false);
+});
+
 test("checks write origin against the configured canonical URL",()=>{
   assert.ok(isSameOrigin("https://onharu.example.invalid","https://onharu.example.invalid"));
   assert.equal(isSameOrigin("https://onharu.example.invalid.attacker.invalid","https://onharu.example.invalid"),false);

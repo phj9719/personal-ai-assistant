@@ -5,6 +5,7 @@ import {settlementsSchema} from "./settlement-validation.ts";
 import {z} from "zod";
 import {modules} from "../features/modules.ts";
 import {billKey, validateBill, validDate, validMonth} from "../features/utilities/model.ts";
+import {monthlyDeletion,monthlyKey} from "../features/finance/monthly-deletion.ts";
 import {accountDetails, readPeriod, validateRule} from "../features/finance/model.ts";
 import {domains, type Domain, type WorkspaceData} from "../features/workspace/data.ts";
 
@@ -46,7 +47,7 @@ const finance = z.strictObject({
   accounts:z.array(account).max(1000),rules:z.array(rule).max(2000),monthly:z.array(monthly).max(12000),transfers:z.array(transfer).max(12000),
 }).refine(({accounts,rules,monthly,transfers})=>{
   if (!unique(accounts,row=>row.id) || !unique(rules,row=>row.id) || !unique(transfers,row=>row.id)
-    || !unique(monthly,row=>row.month+":"+row.ruleId) || !unique(monthly.filter(row=>row.utility),row=>row.month+":"+row.utility)) return false;
+    || !unique(monthly,monthlyKey) || !unique(monthly.filter(row=>row.utility),row=>row.month+":"+row.utility)) return false;
   const byAccount = new Map(accounts.map(row=>[row.id,row]));
   const validPayment = ({accountId,method}:z.infer<typeof payment>)=> {
     if (!accountId) return true;
@@ -95,7 +96,8 @@ const schemas = {
   theme:z.enum(["light","dark"]),
 } satisfies {[K in Domain]:z.ZodType<WorkspaceData[K]>};
 
-export const writeRequest = z.strictObject({domain:z.enum(domains),revision:z.number().int().min(0).max(2147483646),value:z.unknown(),confirmedOutsideResidence:z.literal(true).optional()});
+export const writeRequest = z.strictObject({domain:z.enum(domains),revision:z.number().int().min(0).max(2147483646),value:z.unknown(),confirmedOutsideResidence:z.literal(true).optional(),monthlyDeletion:monthlyDeletion.optional()})
+  .refine(request=>!request.monthlyDeletion || request.domain==="finance");
 export const importRequest = z.strictObject({kind:z.literal("import"),confirmed:z.literal(true),confirmedOutsideResidence:z.literal(true).optional(),data:z.partialRecord(z.enum(domains),z.unknown())});
 export function parseDocument(domain:Domain,value:unknown) {
   return schemas[domain].safeParse(value);
