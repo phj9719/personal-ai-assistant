@@ -197,3 +197,12 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .baseball-note {white-space:pre-wrap;overflow-wrap:anywhere}
 .baseball-booking {border-top:1px solid var(--line);margin-top:12px;padding:12px 0}
 .baseball-preview {max-height:240px;overflow:auto}
+
+.chat-history-item {display:flex;align-items:center;gap:2px}
+.chat-history-item > .button:first-child {min-width:0;flex:1}
+.chat-history-item .chat-history-action {width:auto;flex:none;padding:8px}
+.chat-history-panel .chat-history-clear {margin-top:6px}
+.chat-newline {display:none}
+@media (max-width:760px), (pointer:coarse) {
+  .chat-newline {display:inline-flex}
+}

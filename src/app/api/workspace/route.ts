@@ -1,5 +1,5 @@
 import { authenticatedUserId,authEnabled } from "@/auth";
-import { readDocuments,saveWorkspace } from "@/services/workspace";
+import { readWorkspace,saveWorkspace } from "@/services/workspace";
 import { isSameOrigin } from "@/services/workspace-access";
 
 const noStore = {"Cache-Control":"no-store"};
@@ -11,7 +11,7 @@ export async function GET() {
   if (!authEnabled) return problem("데모에서는 브라우저 저장을 사용합니다.",404);
   const user = await authenticatedUserId();
   if (!user) return problem("로그인이 필요합니다.",401);
-  try { return json({documents:await readDocuments(user)},200); }
+  try { return json({documents:await readWorkspace(user)},200); }
   catch { return problem("데이터베이스에서 데이터를 불러오지 못했습니다.",503); }
 }
 

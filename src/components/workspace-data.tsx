@@ -2,6 +2,8 @@
 
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {browserKeys,domains,emptyData,type Documents,type Domain,type WorkspaceData} from "@/features/workspace/data";
+import type {ChatAction} from "@/features/workspace/chat";
+import type {ChatSession} from "@/features/workspace/data";
 import {Button} from "./ui/button";
 import {useLocal} from "./use-local";
 
@@ -17,7 +19,8 @@ export function WorkspaceStorage({remote,children}:{remote:boolean;children:Reac
   const [pending,setPending] = useState(false);
   const busy = useRef(false);
   const read = useCallback(async (signal?:AbortSignal)=>{
-    const response = await fetch("/api/workspace",{cache:"no-store",signal});
+    const deadline = AbortSignal.timeout(15000);
+    const response = await fetch("/api/workspace",{cache:"no-store",signal:signal ? AbortSignal.any([signal,deadline]) : deadline});
     if (!response.ok) throw new Error(response.status===401 ? "로그인이 만료되었습니다. 다시 로그인해 주세요." : "데이터베이스에서 데이터를 불러오지 못했습니다.");
     const result = await response.json() as {documents:Documents};
     setDocuments(result.documents);
@@ -37,7 +40,7 @@ export function WorkspaceStorage({remote,children}:{remote:boolean;children:Reac
     setError("");
     try {
       const response = await fetch("/api/workspace",{
-        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),
+        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:AbortSignal.timeout(15000),
       });
       const result = await response.json() as {documents?:Documents;error?:string};
       if (!response.ok || !result.documents) {
@@ -88,6 +91,29 @@ export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceDa
     saveLocal(next);
     return true;
   }];
+}
+
+export function useChatHistory():readonly [ChatSession[],(action:ChatAction)=>Promise<boolean>] {
+  const remote = useContext(StorageContext);
+  const [local,saveLocal,current] = useLocal<ChatSession[]>(browserKeys.chat,[],remote===null);
+  const sessions = remote ? (remote.documents.chat?.value as ChatSession[] | undefined) ?? [] : local;
+  return [sessions,async action=>{
+    if (remote) return remote.write(action);
+    saveLocal(editLocalChat(current(),action));
+    return true;
+  }];
+}
+
+function editLocalChat(sessions:ChatSession[],action:ChatAction) {
+  if (action.action==="clear") return [];
+  if (action.action==="delete") return sessions.filter(session=>session.id!==action.sessionId);
+  if (action.action==="rename") return sessions.map(session=>session.id===action.sessionId ? {...session,title:action.title} : session);
+  const existing = sessions.find(session=>session.id===action.sessionId);
+  const target = existing ?? (action.action==="start" ? {id:action.sessionId,title:action.title,messages:[]} : null);
+  if (!target || target.messages.some(message=>message.id===action.messageId)) return sessions;
+  const role = action.action==="reply" ? "assistant" as const : "user" as const;
+  const next = {...target,messages:[...target.messages,{id:action.messageId,role,content:action.content}]};
+  return [next,...sessions.filter(session=>session.id!==target.id)];
 }
 
 const labels:Record<Domain,string> = {

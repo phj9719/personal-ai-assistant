@@ -4,7 +4,7 @@ import type { FinanceState } from "../finance/model";
 import type { Settlements } from "../settlements/model";
 import type { UtilityState } from "../utilities/model";
 
-export type Message = {role:"user"|"assistant";content:string};
+export type Message = {id?:string;role:"user"|"assistant";content:string};
 export type ChatSession = {id:string;title:string;messages:Message[]};
 export type WorkspaceData = {
   records:Records; utilities:UtilityState; finance:FinanceState; settlements:Settlements; baseball:Baseball;

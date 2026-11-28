@@ -1,6 +1,6 @@
 "use client";
 
-import {useState, useSyncExternalStore} from "react";
+import {useRef,useState, useSyncExternalStore} from "react";
 
 const updateEvent = "onharu-storage";
 
@@ -20,6 +20,7 @@ function read(key: string) {
 }
 
 export function useLocal<T>(key: string, initial: T, enabled = true) {
+  const savedFallback = useRef<{value:T}|undefined>(undefined);
   const [fallback, setFallback] = useState<{value:T}>();
   const stored = useSyncExternalStore(enabled ? subscribe : noSubscription, () => enabled ? read(key) : null, () => null);
   let value = initial;
@@ -32,10 +33,20 @@ export function useLocal<T>(key: string, initial: T, enabled = true) {
     try {
       localStorage.setItem(key, JSON.stringify(next));
       window.dispatchEvent(new Event(updateEvent));
+      savedFallback.current = undefined;
       setFallback(undefined);
     } catch {
-      setFallback({value:next});
+      savedFallback.current = {value:next};
+      setFallback(savedFallback.current);
     }
   }
-  return [value, save] as const;
+  function current() {
+    if (savedFallback.current) return savedFallback.current.value;
+    const raw = read(key);
+    if (raw!==null) {
+      try { return JSON.parse(raw) as T; } catch {}
+    }
+    return initial;
+  }
+  return [value, save, current] as const;
 }

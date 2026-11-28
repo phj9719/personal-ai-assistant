@@ -1,5 +1,6 @@
 import {authenticatedUserId, authEnabled} from "@/auth";
 import {isSameOrigin} from "@/services/workspace-access";
+import {aiBudget,aiFailure} from "@/lib/ai/failure";
 import {conversation, MockProvider, OllamaProvider} from "@/lib/ai/provider";
 
 export async function POST(request: Request) {
@@ -12,12 +13,22 @@ export async function POST(request: Request) {
   }
   const input = conversation.safeParse(await request.json().catch(() => null));
   if (!input.success) return Response.json({error:"메시지를 확인해 주세요."},{status:400});
-  const provider = authEnabled && process.env.AI_PROVIDER === "ollama"
+  const useOllama = authEnabled && process.env.AI_PROVIDER === "ollama";
+  const provider = useOllama
     ? new OllamaProvider(process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434",process.env.OLLAMA_MODEL ?? "gemma3:4b")
     : new MockProvider();
+  const started = performance.now();
+  const deadline = AbortSignal.timeout(aiBudget(process.env.AI_TIMEOUT_MS));
+  const signal = AbortSignal.any([request.signal,deadline]);
   try {
-    return Response.json({content:await provider.reply(input.data.messages,request.signal)});
-  } catch {
-    return Response.json({error:"AI에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."},{status:502});
+    return Response.json({content:await provider.reply(input.data.messages,signal)});
+  } catch (error) {
+    const interruption = signal.aborted ? (signal.reason===deadline.reason && deadline.aborted ? "timeout" : "cancelled") : undefined;
+    const failure = aiFailure(error,interruption);
+    console.warn("AI chat request failed",{
+      provider:useOllama ? "ollama" : "mock",
+      reason:failure.reason,durationMs:Math.round(performance.now()-started),upstreamStatus:failure.upstreamStatus,
+    });
+    return Response.json({error:failure.message},{status:failure.status});
   }
 }

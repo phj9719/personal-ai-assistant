@@ -1,10 +1,10 @@
 # 개발 작업 체크리스트
 
-기본 설계와 가상 데이터 UI를 구현했다. 클라우드에서 Linux, Node.js 24, npm 11, Git 및 Docker Compose를 확인했다. 임시 PostgreSQL 17에서 마이그레이션과 운영 모드를 검증했다. Windows 집 PC의 데이터·네트워크 및 실제 Ollama 검증은 남아 있다. 전체 기본 화면 → 실제 데이터 → AI 연동 → 배포 순으로 진행한다. 체크는 검증까지 완료한 경우만 한다.
+기본 설계와 가상 데이터 UI를 구현했다. 클라우드에서 Linux, Node.js 24, npm 11, Git 및 Docker Compose를 확인했다. 임시 PostgreSQL 17에서 마이그레이션과 운영 모드를 검증했다. Windows 집 PC의 개발·운영 구성 및 실제 Ollama·Tailscale 사용은 사용자가 확인했다. 전체 기본 화면 → 실제 데이터 → AI 연동 → 배포 순으로 진행한다. 체크는 검증까지 완료한 경우만 한다.
 
 ## 0. 환경 확인
 - [ ] Windows, Node/npm, Git, VS Code, Docker/Compose, WSL, Codex 설치 확인
-- [ ] Ollama 설치 및 gemma3:4b 한국어 대화, GPU 확인
+- [x] 집 PC Ollama 0.40.19 및 Gemma3 4B 응답 검증 (사용자 확인)
 - [ ] 호환되는 패키지 및 런타임 버전 결정
 
 ## 1. 프로젝트 초기화 및 전체 UI
@@ -19,7 +19,8 @@
 - [x] PostgreSQL 연결 풀, 초기화·마이그레이션 이력, DB 사용자 생성
 - [x] Auth.js Credentials/JWT 로그인, 사용자별 저장과 접근 권한 검증
 - [x] 개발용·운영용 Compose 프로젝트 및 볼륨 분리 절차
-- [ ] 집 PC에서 기존 운영 볼륨 백업·복구 및 마이그레이션
+- [x] 집 PC의 개발·운영 PostgreSQL 17 분리와 수동 백업·복원 테스트 (사용자 확인)
+- [ ] 집 PC의 기존 운영 볼륨에 신규 `007` 적용 및 재확인
 
 ## 3. 실제 기능 연결
 - [x] 일정, 할 일, 가계부, 고정 지출, 저축·투자 및 결제수단 PostgreSQL 저장
@@ -37,7 +38,8 @@
 ## 4. AI 비서
 
 Mock과 Ollama Provider를 구현했다. 운영 모드는 채팅 세션·메시지와 명시적 기억을 PostgreSQL에 저장한다. 기억의 모델 주입과 업무 도구 호출은 남아 있다.
-- [ ] Provider 및 Ollama 연결, 모델 설정, 연결 오류 처리
+- [x] Ollama 연결 실패·타임아웃 안내, 지연 시간 로그와 수동 재시도
+- [x] 채팅 입력 단축키, 한글 IME 보호, 제목 변경 및 개별·전체 삭제
 - [x] 채팅방·메시지·명시적 기억 PostgreSQL 저장 및 재조회
 - [ ] 도구 레지스트리, 읽기/쓰기 구분, 구조화 출력 검증
 - [ ] 기본 조회 및 등록 도구를 각 업무 모듈에 연결
@@ -45,9 +47,13 @@ Mock과 Ollama Provider를 구현했다. 운영 모드는 채팅 세션·메시�
 - [ ] 한국어 의도 처리, 잘못된 입력, AI 오프라인, 권한, 재시도 테스트
 
 ## 5. 운영 배포
-- [ ] 별도 운영 Compose, 환경변수, 영구 저장 및 백업/복구 검증
+사용자 확인 환경은 Windows, Ryzen 5 5600, RAM 16GB, RTX 4060 8GB, Docker Desktop/WSL2다. 운영은 `onharu-prod`·3001·`onharu-prod_assistant-db`, 개발은 `onharu-dev`·3002·`onharu-dev_assistant-db`를 사용한다.
+- [x] SHA-256 체크섬과 Windows 작업 스케줄러 오전 2시(KST) 백업, 30일 보관 (사용자 확인)
+- [x] Windows 재부팅 후 운영 컨테이너·Ollama·Tailscale 자동 실행과 스마트폰 5G AI 응답 (사용자 확인)
+- [x] 운영과 개발의 Compose 재시작 정책 분리
+- [ ] 집 PC에서 새 정책으로 컨테이너 재생성 후 재시작 및 복원 절차 재검증
 - [ ] Docker에서 Ollama 접근 검증, DB/Ollama 인터넷 공개 금지
-- [ ] Tailscale HTTPS 및 기기 접근 제한, 스마트폰 로그인 확인
+- [x] Tailscale HTTPS 및 스마트폰 5G 접속 (사용자 확인)
 - [ ] lint/typecheck/test/build, 운영 기동 및 기본 기능 스모크 테스트
 - [ ] 사용자 승인 후 실제 데이터 입력 시작
 

@@ -83,7 +83,7 @@ const records = z.strictObject({
   utilities:entries("utilities"),knowledge:entries("knowledge"),learning:entries("learning"),analytics:entries("analytics"),
 });
 const chat = z.array(z.strictObject({
-  id,title,messages:z.array(z.strictObject({role:z.enum(["user","assistant"]),content:z.string().trim().min(1).max(2000)})).max(5000),
+  id,title,messages:z.array(z.strictObject({id:id.optional(),role:z.enum(["user","assistant"]),content:z.string().trim().min(1).max(2000)})).max(5000),
 })).max(1000).refine(rows=>unique(rows,row=>row.id));
 
 const schemas = {
