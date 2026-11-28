@@ -11,11 +11,13 @@ import {
   methods, modes, outstanding, purposes, type Account, type FinanceState, type Monthly, type Payment, type Rule, type Transfer,
 } from "./model";
 
+import {SubscriptionsView} from "../subscriptions/view";
+import {forecasts,paidWon,postedExpenses,type Subscriptions} from "../subscriptions/model";
 import {baseballExpenses,type Baseball} from "../baseball/model";
 import {SettlementsView} from "../settlements/view";
 import {cashPayments,linkedIds,type Settlements} from "../settlements/model";
 
-const tabs = ["수입·지출 내역","고정 지출 관리","저축 및 투자","결제수단 관리","월별 통계","정산·대납 관리"];
+const tabs = ["수입·지출 내역","고정 지출 관리","저축 및 투자","결제수단 관리","월별 통계","정산·대납 관리","구독 서비스 관리"];
 const currency = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:2});
 const money = (amount:number|null)=>amount===null ? "미확인" : currency.format(amount)+"원";
 const estimate = ({amount,min,max}:ReturnType<typeof expected>)=>amount!==null ? money(amount) :
@@ -51,10 +53,10 @@ function MonthlyList({rows,accounts,utilities,onEdit}:{rows:Monthly[];accounts:A
   </li>)}</ul> : <p className="empty">생성된 월별 내역이 없습니다.</p>}</>;
 }
 
-function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,settlements,baseball}:{
-  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;settlements:Settlements;baseball:Baseball;
+function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,settlements,baseball,subscriptions}:{
+  month:string;monthly:Monthly[];transfers:Transfer[];records:Records;accounts:Account[];utilities:UtilityState;settlements:Settlements;baseball:Baseball;subscriptions:Subscriptions;
 }) {
-  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities,settlements,baseball);
+  const stats = financeStatistics(month,monthly,transfers,records.finance,utilities,settlements,baseball,subscriptions);
   const linked = linkedIds(settlements);
   const payments = new Map<string,number>();
   function addPayment(payment:Payment|null,amount:number) {
@@ -71,8 +73,19 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,s
   for (const row of baseballExpenses(baseball,month,settlements,records.finance)) {
     payments.set(row.account,(payments.get(row.account) ?? 0)+row.cash*100);
   }
+  for (const {row,amount} of postedExpenses(subscriptions,month)) {
+    const name="구독 · "+(accounts.find(account=>account.id===row.accountId)?.name ?? "미지정");
+    payments.set(name,(payments.get(name) ?? 0)+Math.round(amount*100));
+  }
   const dates = new Map<string,ReturnType<typeof expected>[]>();
-  for (const row of monthly.filter(row=>row.month===month && row.paidOn===null)) {
+  const [year,part]=month.split("-").map(Number);
+  const upcoming=forecasts(subscriptions,month+"-01",month+"-"+new Date(Date.UTC(year,part,0)).getUTCDate());
+  const represented=new Set(subscriptions.services.map(row=>row.ruleId).filter(Boolean));
+  for (const row of upcoming.filter(row=>!row.payment || row.payment.state==="pending")) {
+    if (monthly.some(fixed=>fixed.month===month && fixed.ruleId===row.service.ruleId && fixed.paidOn && upcoming.filter(item=>item.service.id===row.service.id).length===1)) continue;
+    dates.set(row.due,[...(dates.get(row.due) ?? []),{amount:row.amount,min:null,max:null}]);
+  }
+  for (const row of monthly.filter(row=>row.month===month && row.paidOn===null && !represented.has(row.ruleId))) {
     const label = row.due ? row.due+(row.timing==="approximate" ? "경" : "") : "미지정";
     dates.set(label,[...(dates.get(label) ?? []),outstanding(row,utilities)]);
   }
@@ -99,10 +112,10 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,s
 type Editor = {kind:"rule";rule?:Rule} | {kind:"account";account?:Account} | {kind:"transfer";transfer?:Transfer} | {kind:"monthly";row:Monthly};
 type Removal = {kind:"rule"|"account"|"transfer";id:string};
 
-export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements,baseball}:{
-  state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;baseball:Baseball;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
+export function FinanceView({state,save,records,updateRecords,utilities,today,theme,settlements,saveSettlements,baseball,subscriptions,saveSubscriptions,initialTab}:{initialTab?:number;
+  subscriptions:Subscriptions;saveSubscriptions:(state:Subscriptions)=>Promise<boolean>;state:FinanceState;save:(state:FinanceState)=>Promise<boolean>;baseball:Baseball;settlements:Settlements;saveSettlements:(value:Settlements)=>Promise<boolean>;records:Records;updateRecords:(records:Records)=>Promise<boolean>; utilities:UtilityState; today:string; theme:"light"|"dark";
 }) {
-  const [tab,setTab] = useState(0);
+  const [tab,setTab] = useState(initialTab ?? 0);
   const [month,setMonth] = useState(today.slice(0,7));
   const [editing,setEditing] = useState<Editor|null>(null);
   const [removing,setRemoving] = useState<Removal|null>(null);
@@ -128,10 +141,14 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
     </div>
     <section role="tabpanel" id="finance-panel" aria-labelledby={"finance-tab-"+tab}>
       {tab===0 ? <>
-        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords} linked={new Set([...linkedIds(settlements),...baseball.tickets.flatMap(row=>row.entryId ? [row.entryId] : [])])}/>
+        <RecordsView module="finance" records={records} today={today} theme={theme} onChange={updateRecords} linked={new Set([...linkedIds(settlements),...baseball.tickets.flatMap(row=>row.entryId ? [row.entryId] : []),...subscriptions.payments.flatMap(row=>row.entryId ? [row.entryId] : [])])}/>
+        {subscriptions.payments.some(row=>row.posted) && <section className="panel"><h2>구독에서 확정한 지출</h2><ul className="rows">{subscriptions.payments.filter(row=>row.posted)
+          .sort((a,b)=>(b.paidOn ?? "").localeCompare(a.paidOn ?? "")).map(row=><li key={row.id}><span>{row.paidOn} · {subscriptions.services.find(item=>item.id===row.serviceId)?.title}</span>
+            <strong>{money(paidWon(row))}</strong></li>)}</ul></section>}
         <p className="muted">이 탭에는 원본 거래금액이 표시됩니다. 본인 소비와 실제 자금 유출은 월별 통계에서 확인할 수 있습니다.</p>
       </> : tab===5 ? <SettlementsView cases={settlements} save={saveSettlements} ledger={records.finance}
-        accounts={state.accounts.filter(account=>!account.archived).map(account=>account.institution+" · "+account.name)} today={today}/> : <>
+        accounts={state.accounts.filter(account=>!account.archived).map(account=>account.institution+" · "+account.name)} today={today}/> : tab===6 ? <SubscriptionsView data={subscriptions} save={saveSubscriptions} finance={state}
+          ledger={records.finance} settlements={settlements} baseball={baseball} today={today}/> : <>
         <div className="page-title finance-title">
           <h1>{tabs[tab]}</h1>
           {tab!==3 && <label>조회 월<input aria-label="조회 월" type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label>}
@@ -140,7 +157,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
         {tab===1 && <>
           <section className="panel">
             <div className="finance-heading"><h2>월별 예정·납부 내역</h2><Button disabled={!validMonth(month)} onClick={async ()=>{
-              const monthly = createMonth(state.rules,state.monthly,month);
+              const monthly = createMonth(state.rules.filter(rule=>!subscriptions.services.some(row=>row.ruleId===rule.id)),state.monthly,month);
               const added = monthly.length-state.monthly.length;
               if (added && !await save({...state,monthly})) return;
               setStatus(added ? added+"건의 예정 내역을 생성했습니다." : "새로 생성할 예정 내역이 없습니다.");
@@ -152,7 +169,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
             <ul className="rows finance-rows">{state.rules.filter(rule=>!rule.archived).map(rule=><li key={rule.id}>
               <div><strong>{rule.title}</strong><p>{purposes[rule.purpose]} · {modes[rule.quote.mode]} · {rule.active ? "활성" : "비활성"}</p>
                 <p>{rule.start} ~ {rule.end ?? "종료일 없음"} · {paymentLabel(rule.payment,state.accounts)}</p>
-                {rule.utility && <p>{links[rule.utility]} 연결</p>}</div>
+                {rule.utility && <p>{links[rule.utility]} 연결</p>}{subscriptions.services.some(row=>row.ruleId===rule.id) && <p>예정 내역은 구독 서비스에서 관리합니다.</p>}</div>
               <div className="row-actions"><Button variant="outline" aria-label={rule.title+" 설정 수정"} onClick={()=>setEditing({kind:"rule",rule})}>수정</Button>
                 <Button variant="ghost" aria-label={rule.title+" 설정 삭제"} onClick={()=>setRemoving({kind:"rule",id:rule.id})}>삭제</Button></div>
             </li>)}</ul>
@@ -179,7 +196,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
               <Button variant="ghost" aria-label={account.name+" 보관"} onClick={()=>setRemoving({kind:"account",id:account.id})}>보관</Button></div>
           </li>)}</ul>
         </section>}
-        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements} baseball={baseball}/> :
+        {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements} baseball={baseball} subscriptions={subscriptions}/> :
           <p className="empty">조회 월을 선택해 주세요.</p>)}
       </>}
     </section>

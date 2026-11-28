@@ -10,7 +10,7 @@ export const modules = {
 } as const;
 
 export type ModuleKey = keyof typeof modules;
-export type Entry = { id: string; title: string; group: string; date: string; amount: number; detail: string };
+export type Entry = { completed?:boolean; completedOn?:string; id: string; title: string; group: string; date: string; amount: number; detail: string };
 export type Records = Record<ModuleKey, Entry[]>;
 
 export function seoulDate(now = new Date()) {

@@ -46,7 +46,7 @@ function TransactionsChart({ rows, groups }: {rows:Entry[];groups:readonly strin
   </ResponsiveContainer></section>;
 }
 
-export function RecordsView({module,records,today,theme,consumption,onChange,linked,baseballEvents=[]}:{baseballEvents?:BaseballEvent[];linked?:Set<string>;module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
+export function RecordsView({module,records,today,theme,consumption,onChange,linked,baseballEvents=[],linkedEvents=[]}:{linkedEvents?:{id:string;title:string;date:string;url:string;color:string}[];baseballEvents?:BaseballEvent[];linked?:Set<string>;module:ModuleKey;records:Records;today:string;theme:"light"|"dark";consumption?:number;onChange:(records:Records)=>Promise<boolean>}) {
   const config = modules[module];
   const [query,setQuery] = useState("");
   const [group,setGroup] = useState("");
@@ -86,18 +86,21 @@ export function RecordsView({module,records,today,theme,consumption,onChange,lin
             timeZone="UTC"
             events={[...rows.map(row=>({id:row.id,title:row.title,date:row.date})),...baseballEvents.map(event=>({
               ...event,url:"/baseball?game="+encodeURIComponent(event.gameId),backgroundColor:event.color,borderColor:event.color,textColor:"#fff",
-            }))]}
+            })),...linkedEvents.map(event=>({...event,start:event.date,backgroundColor:event.color,borderColor:event.color,textColor:"#fff",allDay:true}))]}
             eventClick={event=>{
               if (!event.event.url) setEditing(rows.find(row=>row.id === event.event.id) ?? null);
             }}
           />
+          {linkedEvents.length>0 && <details><summary>일상·구독 연동 일정</summary><ul className="rows">{linkedEvents.map(event=><li key={event.id}>
+            <Link href={event.url} className="baseball-link">{event.title}</Link><span>{event.date}</span>
+          </li>)}</ul></details>}
           {baseballEvents.length>0 && <details><summary>야구 연동 일정</summary><ul className="rows">{baseballEvents.map(event=><li key={event.id}>
             <Link href={"/baseball?game="+encodeURIComponent(event.gameId)} className="baseball-link">{event.title}</Link><span>{event.start.replace("T"," ")}</span>
           </li>)}</ul></details>}
         </div>}
         {rows.length ? <ul className="rows">{rows.map(row=><li key={row.id}>
-          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}{linked?.has(row.id) && <p>야구 또는 정산·대납에 연결됨 · 연결 해제 후 수정·삭제할 수 있습니다.</p>}</div>
-          <div className="row-actions">{module === "tasks" && row.group !== "완료" && <Button variant="outline" onClick={()=>replace(records[module].map(item=>item.id === row.id ? {...item,group:"완료"} : item))}>완료</Button>}
+          <div><strong>{row.title}</strong><p>{[row.group,row.date,config.unit && number.format(row.amount)+config.unit].filter(Boolean).join(" · ")}</p>{row.detail && <p>{row.detail}</p>}{module==="schedule" && row.completed && <p>완료 · {row.completedOn ?? row.date}</p>}{linked?.has(row.id) && <p>야구·정산·구독 기록에 연결됨 · 연결 해제 후 수정·삭제할 수 있습니다.</p>}</div>
+          <div className="row-actions">{module === "tasks" && row.group !== "완료" && <Button variant="outline" onClick={()=>replace(records[module].map(item=>item.id === row.id ? {...item,group:"완료",completedOn:today} : item))}>완료</Button>}
           <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 수정"} onClick={()=>setEditing(row)}><Pencil size={17}/></Button>
           <Button variant="ghost" disabled={linked?.has(row.id)} aria-label={row.title+" 삭제"} onClick={()=>setDeleting(row)}><Trash2 size={17}/></Button></div>
         </li>)}</ul> : <p className="empty">표시할 항목이 없습니다.</p>}
@@ -114,12 +117,19 @@ export function RecordsView({module,records,today,theme,consumption,onChange,lin
         return;
       }
       const item:Entry = {id:editing.id || crypto.randomUUID(),title,group:String(data.get("group")),date:String(data.get("date")),amount:Number(data.get("amount") ?? 0),detail:String(data.get("detail")).trim()};
+      if (module==="schedule" && data.has("completed")) {
+        item.completed=true;
+        item.completedOn=String(data.get("completedOn") || editing.completedOn || today);
+      }
+      if (module==="tasks" && item.group==="완료") item.completedOn=String(data.get("completedOn") || editing.completedOn || today);
       if (await replace(editing.id ? records[module].map(row=>row.id === item.id ? item : row) : [...records[module],item])) setEditing(null);
     }}>
       <h2 id="entry-title">{editing.id ? "항목 수정" : "항목 추가"}</h2>
       <label>이름<input autoFocus name="title" defaultValue={editing.title} required maxLength={100} onInput={event=>event.currentTarget.setCustomValidity("")}/></label>
       <label>분류<select name="group" defaultValue={editing.group}>{config.groups.map(item=><option key={item}>{item}</option>)}</select></label>
       <label>날짜<input name="date" type="date" defaultValue={editing.date} required/></label>
+      {module==="schedule" && <label className="utility-checkbox"><input name="completed" type="checkbox" defaultChecked={editing.completed}/>완료 일정</label>}
+      {(module==="schedule" || module==="tasks") && <label>완료일 (미입력 시 오늘)<input name="completedOn" type="date" defaultValue={editing.completedOn ?? ""}/></label>}
       {config.unit && <label>수량 또는 금액 ({config.unit})<input name="amount" type="number" min={module === "finance" ? 1 : 0} max={999999999} defaultValue={editing.amount} required/></label>}
       <label>상세 내용<textarea name="detail" maxLength={1000} defaultValue={editing.detail}/></label>
       <div className="row-actions"><Button type="button" variant="outline" onClick={()=>setEditing(null)}>취소</Button><Button type="submit">저장</Button></div>

@@ -117,6 +117,7 @@ function editLocalChat(sessions:ChatSession[],action:ChatAction) {
 }
 
 const labels:Record<Domain,string> = {
+  life:"일상 기록·돌아가며 결제",subscriptions:"구독 서비스·결제 이력",
   records:"일정·할 일·가계부 거래·재고·메모·개발·생활 기록",
   utilities:"거주 기간 및 공과금",finance:"고정 지출·저축·투자·결제수단",
   baseball:"야구 경기·예매·직관",settlements:"정산·대납 및 입금",chat:"채팅 세션과 메시지",memories:"AI 기억",theme:"테마",

@@ -1,3 +1,5 @@
+import {lifeSchema} from "../features/life/model.ts";
+import {subscriptionsSchema} from "../features/subscriptions/model.ts";
 import {baseballSchema} from "./baseball-validation.ts";
 import {settlementsSchema} from "./settlement-validation.ts";
 import {z} from "zod";
@@ -75,7 +77,7 @@ function entries(module:keyof typeof modules) {
   const config = modules[module];
   const amount = config.unit==="원" ? money : quantity;
   return z.array(z.strictObject({
-    id,title,group:z.string().refine(value=>(config.groups as readonly string[]).includes(value)),date,amount,detail:description,
+    id,title,completed:z.boolean().optional(),completedOn:date.optional(),group:z.string().refine(value=>(config.groups as readonly string[]).includes(value)),date,amount,detail:description,
   })).max(15000).refine(rows=>unique(rows,row=>row.id) && (module!=="finance" || rows.every(row=>row.amount>0)));
 }
 const records = z.strictObject({
@@ -87,7 +89,7 @@ const chat = z.array(z.strictObject({
 })).max(1000).refine(rows=>unique(rows,row=>row.id));
 
 const schemas = {
-  records,utilities,finance,settlements:settlementsSchema,baseball:baseballSchema,chat,memories:z.array(z.string().trim().min(1).max(300)).max(2000),
+  records,utilities,finance,life:lifeSchema,subscriptions:subscriptionsSchema,settlements:settlementsSchema,baseball:baseballSchema,chat,memories:z.array(z.string().trim().min(1).max(300)).max(2000),
   theme:z.enum(["light","dark"]),
 } satisfies {[K in Domain]:z.ZodType<WorkspaceData[K]>};
 

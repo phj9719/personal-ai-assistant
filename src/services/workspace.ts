@@ -1,9 +1,10 @@
+import {subscriptionHistoryError,subscriptionLinks} from "../features/subscriptions/links";
 import {chatAction} from "../features/workspace/chat";
 import {changeChat,ChatWriteConflict,readChat} from "../repositories/chat";
 import { DocumentConstraint,importDocuments,readDocuments,writeDocument } from "../repositories/workspace";
 import {baseballGuard} from "./baseball-validation";
 import {settlementGuard} from "./settlement-validation";
-import { domains, type Domain,type Documents } from "../features/workspace/data";
+import { domains,emptyData,type WorkspaceData,type Domain,type Documents } from "../features/workspace/data";
 import { importRequest, parseDocument, writeRequest } from "./workspace-validation";
 
 export async function readWorkspace(userId:string) {
@@ -53,5 +54,10 @@ async function persist(userId:string,body:unknown) {
 }
 
 function guardWorkspace(current:Documents,changes:[Domain,unknown][]) {
-  return settlementGuard(current,changes) || baseballGuard(current,changes);
+  const issue=settlementGuard(current,changes) || baseballGuard(current,changes);
+  if (issue) return issue;
+  const updates=new Map(changes);
+  const get=<K extends Domain>(key:K)=>(updates.get(key) ?? current[key]?.value ?? emptyData[key]) as WorkspaceData[K];
+  const previous=(current.subscriptions?.value ?? emptyData.subscriptions) as WorkspaceData["subscriptions"];
+  return subscriptionHistoryError(previous,get("subscriptions")) || subscriptionLinks(get("subscriptions"),get("records").finance,get("finance"),get("settlements"),get("baseball"));
 }

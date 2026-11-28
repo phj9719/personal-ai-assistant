@@ -1,3 +1,4 @@
+import {forecasts,initialSubscriptions,postedExpenses,type Subscriptions} from "../subscriptions/model.ts";
 import {baseballExpenses,initialBaseball,type Baseball} from "../baseball/model.ts";
 import {linkedIds,settlementFlows,type Settlements} from "../settlements/model.ts";
 import { effectiveScope, validDate, validMonth, type UtilityState } from "../utilities/model.ts";
@@ -112,15 +113,23 @@ export function estimateTotals(estimates:ReturnType<typeof expected>[]) {
   };
 }
 
-export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{id?:string;group:string;amount:number;date:string}[], utility:UtilityState, settlements:Settlements=[], baseball:Baseball=initialBaseball) {
+export function financeStatistics(month:string, monthly:Monthly[], transfers:Transfer[], ledger:{id?:string;group:string;amount:number;date:string}[], utility:UtilityState, settlements:Settlements=[], baseball:Baseball=initialBaseball,subscriptions:Subscriptions=initialSubscriptions) {
   const rows = monthly.filter(row=>row.month===month);
   const linked = linkedIds(settlements);
   const settlement = settlementFlows(settlements,month);
   const baseballRows=baseballExpenses(baseball,month,settlements,ledger);
   const baseballCost=add(baseballRows.map(row=>row.amount));
   const records = ledger.filter(row=>row.date.startsWith(month) && (!row.id || !linked.has(row.id)));
-  const planned = rows.map(expected);
-  const remaining = rows.filter(row=>row.paidOn===null).map(row=>outstanding(row,utility));
+  const [year,part]=month.split("-").map(Number);
+  const last=month+"-"+new Date(Date.UTC(year,part,0)).getUTCDate();
+  const projected=forecasts(subscriptions,month+"-01",last).filter(row=>row.payment?.state!=="skipped");
+  const represented=new Set(subscriptions.services.map(row=>row.ruleId).filter(Boolean));
+  const outstandingSubscriptions=projected.filter(row=>row.payment?.state!=="paid" &&
+    !rows.some(fixed=>fixed.ruleId===row.service.ruleId && fixed.paidOn && projected.filter(item=>item.service.id===row.service.id).length===1));
+  const subEstimate=(row:typeof projected[number])=>({amount:row.amount,min:null,max:null});
+  const planned = [...rows.filter(row=>!represented.has(row.ruleId)).map(expected),...projected.map(subEstimate)];
+  const remaining = [...rows.filter(row=>row.paidOn===null && !represented.has(row.ruleId)).map(row=>outstanding(row,utility)),...outstandingSubscriptions.map(subEstimate)];
+  const subscriptionCost=add(postedExpenses(subscriptions,month).map(row=>row.amount));
   const paid = monthly.filter(row=>row.paidOn?.slice(0,7)===month && row.paidAmount!==null);
   const flow = (purpose:Purpose)=>add([
     ...paid.filter(row=>row.purpose===purpose).map(row=>row.paidAmount!),
@@ -128,9 +137,9 @@ export function financeStatistics(month:string, monthly:Monthly[], transfers:Tra
     ...(purpose==="consumption" ? records.filter(row=>row.group==="지출").map(row=>row.amount) : []),
   ]);
   const ownExpenses=flow("consumption"), savings=flow("savings"), investment=flow("investment");
-  const consumption=add([ownExpenses,settlement.consumption,baseballCost]);
+  const consumption=add([ownExpenses,settlement.consumption,baseballCost,subscriptionCost]);
   const income=add(records.filter(row=>row.group==="수입").map(row=>row.amount));
-  const outflow=add([ownExpenses,savings,investment,settlement.outflow,...baseballRows.map(row=>row.cash)]);
+  const outflow=add([ownExpenses,savings,investment,settlement.outflow,subscriptionCost,...baseballRows.map(row=>row.cash)]);
   return {planned:estimateTotals(planned),remaining:estimateTotals(remaining),paid:add(paid.map(row=>row.paidAmount!)),
     consumption,savings,investment,income,outflow,refunds:settlement.refunds,balance:add([income,settlement.refunds,-outflow])};
 }
