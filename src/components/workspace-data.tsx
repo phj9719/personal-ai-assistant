@@ -193,8 +193,8 @@ export function BrowserImport() {
     }}/></label>
     {preview && <>
       <ul>{domains.filter(domain=>Object.hasOwn(preview,domain)).map(domain=><li key={domain}>{labels[domain]}</li>)}</ul>
-      <label className="utility-checkbox"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>현재 계정으로 위 데이터를 가져오는 데 동의합니다.</label>
-      {warns && <label className="utility-checkbox"><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 가져오는 데 동의합니다.</label>}
+      <label><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>현재 계정으로 위 데이터를 가져오는 데 동의합니다.</label>
+      {warns && <label><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 가져오는 데 동의합니다.</label>}
       <div><Button disabled={!confirmed || (warns && !outside)} onClick={async ()=>{
         if (await remote.write({kind:"import",confirmed:true,confirmedOutsideResidence:outside ? true : undefined,data:preview})) {
           setPreview(null);

@@ -81,7 +81,7 @@ export function RuleForm({rule,rules,accounts,today,onSave,onClose}:{rule?:Rule;
     <label>적용 종료일<input name="end" type="date" defaultValue={rule?.end ?? ""}/></label>
     <PaymentFields accounts={accounts} payment={rule?.payment}/>
     <label>공과금 연결<select name="utility" defaultValue={rule?.utility ?? ""}><option value="">연결 안 함</option>{options(links)}</select></label>
-    <label className="utility-checkbox"><input type="checkbox" name="active" defaultChecked={rule?.active ?? true}/>활성화</label>
+    <label><input type="checkbox" name="active" defaultChecked={rule?.active ?? true}/>활성화</label>
   </FormDialog>;
 }
 
@@ -101,7 +101,7 @@ export function MonthlyForm({row,accounts,today,onSave,onClose}:{row:Monthly;acc
       <label>이자 계산 종료일<input name="periodEnd" type="date" defaultValue={row.periodEnd} required/></label>
     </>}
     <PaymentFields accounts={accounts} payment={row.payment}/>
-    <label className="utility-checkbox"><input type="checkbox" checked={paid} onChange={event=>setPaid(event.target.checked)}/>납부 완료</label>
+    <label><input type="checkbox" checked={paid} onChange={event=>setPaid(event.target.checked)}/>납부 완료</label>
     {paid && <>
       <label>실제 납부일<input name="paidOn" type="date" defaultValue={row.paidOn ?? today} required/></label>
       <label>실제 납부 금액 (원)<input name="paidAmount" inputMode="decimal" defaultValue={row.paidAmount ?? ""} required/></label>

@@ -73,7 +73,7 @@ export function BillEditor({bill,originalKey,bills,residence,onSave,onClose}:{
         </label>)}
       </div>
       {bill.kind==="management" && <>
-        <label className="utility-checkbox"><input type="checkbox" name="parkingInBase" defaultChecked={bill.parkingInBase} onChange={resetConfirmation}/>기본 관리비에 주차비가 이미 포함됨</label>
+        <label><input type="checkbox" name="parkingInBase" defaultChecked={bill.parkingInBase} onChange={resetConfirmation}/>기본 관리비에 주차비가 이미 포함됨</label>
         <p className="muted">주차비 칸에는 고지서 합계에 포함된 금액을 입력하세요. 기본 관리비에 주차비가 이미 포함된 경우 위 항목을 선택하면 세부 합계에 한 번만 반영됩니다. 고지서 합계는 원본대로 입력하세요. 주차비가 없다고 확인한 경우 0을 입력하세요.</p>
       </>}
       <fieldset key={bill.kind==="gas" ? "gas" : month+scope} className="utility-fields utility-gas-fields" onChange={resetConfirmation}>
@@ -87,7 +87,7 @@ export function BillEditor({bill,originalKey,bills,residence,onSave,onClose}:{
       {!!errors.length && <ul role="alert" className="utility-errors">{errors.map(error=><li key={error}>{error}</li>)}</ul>}
       {!!warnings.length && <>
         <p role="alert" className="utility-errors">{warnings.join(" ")}</p>
-        <label className="utility-checkbox"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 저장합니다.</label>
+        <label><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 저장합니다.</label>
       </>}
       <div className="row-actions"><Button type="button" variant="outline" onClick={onClose}>취소</Button><Button type="submit" disabled={warnings.length>0 && !confirmed}>저장</Button></div>
     </form>

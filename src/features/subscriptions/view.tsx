@@ -115,7 +115,7 @@ export function SubscriptionsView({data,save,finance,ledger,settlements,baseball
       <section className="panel"><h2>최근 금액 변경</h2><ul className="rows">{changeRows.filter(row=>row.before && (row.before.amount!==row.after.amount || row.before.currency!==row.after.currency)).slice(0,8).map(row=><li key={row.id}><span>{row.date} · {row.after.title}</span><span>{changed(row)}</span></li>)}</ul></section>
     </>}
     {tab===1 && <section className="panel"><h2>구독 서비스 목록</h2>
-      <label className="utility-checkbox"><input type="checkbox" checked={showEnded} onChange={event=>setEnded(event.target.checked)}/>종료한 구독 포함</label>
+      <label><input type="checkbox" checked={showEnded} onChange={event=>setEnded(event.target.checked)}/>종료한 구독 포함</label>
       <ul className="rows finance-rows">{data.services.filter(row=>showEnded || row.status!=="ended" && (!row.end || row.end>=today) && (row.status!=="trial" || row.renew || !row.trialEnd || row.trialEnd>=today)).map(row=><li key={row.id}>
         <div><strong>{row.title} · {statuses[row.status]}</strong><p>{[row.category,row.plan,row.vendor,period(row),native(row.amount,row.currency),accountOf(row.accountId)].filter(Boolean).join(" · ")}</p>
           <p>다음 결제 {upcoming.find(item=>item.service.id===row.id)?.due ?? "—"} · 종료 {row.end ?? "미지정"}{row.ruleId ? " · 고정지출 연결" : ""}</p>
@@ -192,7 +192,7 @@ export function SubscriptionsView({data,save,finance,ledger,settlements,baseball
       <Select name="ruleId" label="고정지출 연결" value={edit.ruleId}><option value="">연결 없음</option>{finance.rules.filter(row=>row.purpose==="consumption" && !row.utility && (!row.archived || row.id===edit.ruleId)).map(row=><option key={row.id} value={row.id}>{row.title}</option>)}</Select>
       <Input name="website" label="홈페이지 URL" type="url" value={edit.website}/><Input name="manage" label="구독 관리·해지 URL" type="url" value={edit.manage}/>
       <Input name="reminders" label="알림 (며칠 전, 쉼표 구분)" value={edit.reminders.join(",")}/><Input name="note" label="메모" value={edit.note}/>
-      <label className="utility-checkbox"><input type="checkbox" name="renew" defaultChecked={edit.renew}/>자동 갱신</label>
+      <label><input type="checkbox" name="renew" defaultChecked={edit.renew}/>자동 갱신</label>
     </Editor>}
     {pay && <Editor title="구독 결제 이력" close={()=>setPay(null)} submit={async form=>{
       const state=field(form,"state");
@@ -230,7 +230,7 @@ export function SubscriptionsView({data,save,finance,ledger,settlements,baseball
       <Select name="fixedMonth" label="고정지출 납부 이력" value={pay.fixedMonth}><option value="">선택</option>{finance.monthly.filter(row=>(row.ruleId===data.services.find(item=>item.id===pay.serviceId)?.ruleId || row.ruleId===pay.fixedRuleId && row.month===pay.fixedMonth) && row.paidOn)
         .map(row=><option key={row.month} value={row.month}>{row.month} · {row.paidOn} · {wonText(row.paidAmount)}</option>)}</Select>
       <Input name="note" label="메모" value={pay.note}/>
-      <label className="utility-checkbox"><input type="checkbox" name="confirm" defaultChecked={pay.posted}/>지출 반영 또는 기존 완료 상태 변경 확인</label>
+      <label><input type="checkbox" name="confirm" defaultChecked={pay.posted}/>지출 반영 또는 기존 완료 상태 변경 확인</label>
     </Editor>}
     {categories && <Editor title="구독 분류 관리" close={()=>setCategories(false)} submit={async form=>{
       const before=field(form,"before"),after=field(form,"after");

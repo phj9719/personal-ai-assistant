@@ -69,7 +69,7 @@ export function GameForm({initial,team,existing,record,onSave,onClose}:{
         <NumberField name="cost" label="직접 기록한 티켓값 (원)" value={initial.cost}/>
         <Text name="seat" label="좌석 정보" value={initial.seat}/>
         <Text name="companions" label="동행인" value={initial.companions}/>
-        <label className="utility-checkbox"><input type="checkbox" name="planned" defaultChecked={initial.planned}/>직관 예정</label>
+        <label><input type="checkbox" name="planned" defaultChecked={initial.planned}/>직관 예정</label>
       </div>
       <datalist id="baseball-teams">{[...new Set([...Object.values(aliases),team])].map(row=><option key={row} value={row}/>)}</datalist>
       {existing && <p className="muted">{homeSide(initial,team)} · 기존 결과 {outcome(initial,team) ?? "미집계"}</p>}
@@ -115,7 +115,7 @@ export function TicketForm({initial,games,ledger,settlements,accounts,now,onSave
       <div className="settlement-inline">
         <label>경기<select name="gameId" defaultValue={initial.gameId} required>{games.map(game=><option key={game.id} value={game.id}>{game.date} · {gameName(game)}</option>)}</select></label>
         <label>예매 상태<select value={status} onChange={event=>setBooking(event.target.value as Ticket["status"])}>{options(booking)}</select></label>
-        <label className="utility-checkbox"><input type="checkbox" checked={status==="booked"} onChange={event=>setBooking(event.target.checked ? "booked" : "unbooked")}/>예매 완료</label>
+        <label><input type="checkbox" checked={status==="booked"} onChange={event=>setBooking(event.target.checked ? "booked" : "unbooked")}/>예매 완료</label>
         <label>일반 예매 시작 (서울)<input name="general" type="datetime-local" defaultValue={initial.general ?? ""}/></label>
         <label>선예매 시작 (서울)<input name="early" type="datetime-local" defaultValue={initial.early ?? ""}/></label>
         <label>실제 예매 완료 시각 (서울)<input type="datetime-local" value={bookedAt} required={status==="booked"} onChange={event=>setBookedAt(event.target.value)}/></label>

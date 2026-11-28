@@ -198,7 +198,7 @@ export function LifeView({data,save,records,baseball,today,theme,initialDay}:{in
       <Input name="members" label="참여 인원 (쉼표 구분)" value={editing.row.members.join(", ")}/>
       <Input name="order" label="결제 순서 (쉼표 구분)" value={editing.row.order.join(", ")}/>
       <Input name="next" label="다음 결제자 수동 지정 (비울 때까지 우선)" value={editing.row.next}/><Input name="note" label="메모" value={editing.row.note}/>
-      <label className="utility-checkbox"><input type="checkbox" name="active" defaultChecked={editing.row.active}/>활성</label>
+      <label><input type="checkbox" name="active" defaultChecked={editing.row.active}/>활성</label>
     </Editor>}
     {editing?.kind==="purchase" && <Editor title="돌아가며 결제 기록" close={close} submit={async form=>{
       const raw=Object.fromEntries([...form].map(([key,value])=>[key,String(value)]));
@@ -216,7 +216,7 @@ export function LifeView({data,save,records,baseball,today,theme,initialDay}:{in
       <Input name="장소" label="장소 또는 업체명" value={editing.row.place}/><Input name="내용" label="구매 내용" value={editing.row.detail}/>
       <Input name="금액" label="결제 금액 (원)" type="number" value={editing.row.amount}/><Input name="동행" label="함께한 사람" value={editing.row.people.join(", ")}/>
       <Input name="모임" label="같은 날 모임 식별 이름" value={editing.row.session}/><Input name="회차" label="회차" value={editing.row.round}/>
-      <Input name="메모" label="메모" value={editing.row.note}/><label className="utility-checkbox"><input type="checkbox" name="participates" defaultChecked={editing.row.participates}/>결제 순서에 반영</label>
+      <Input name="메모" label="메모" value={editing.row.note}/><label><input type="checkbox" name="participates" defaultChecked={editing.row.participates}/>결제 순서에 반영</label>
     </Editor>}
     {deleting && <Editor title="기록 삭제 확인" close={()=>setDelete(null)} submit={async ()=>{
       if (!await save(deleting.data)) return "삭제하지 못했습니다.";

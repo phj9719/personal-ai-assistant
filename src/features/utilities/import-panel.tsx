@@ -82,8 +82,8 @@ export function ImportPanel({state,onImport,onClose}:{state:UtilityState;onImpor
           typeof value==="boolean" ? (value ? "예" : "아니오") : value ?? "—",
         ].join(" ")).join(" · ")}{bill.note && " · 비고 "+bill.note}</small>}
       </li>)}</ul>
-      {duplicate && <label className="utility-checkbox"><input type="checkbox" checked={confirm} onChange={event=>setConfirm(event.target.checked)}/>청구월·청구 종류·데이터 유형이 같은 기존 내역 수정을 확인했습니다.</label>}
-      {warns && <label className="utility-checkbox"><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 저장합니다.</label>}
+      {duplicate && <label><input type="checkbox" checked={confirm} onChange={event=>setConfirm(event.target.checked)}/>청구월·청구 종류·데이터 유형이 같은 기존 내역 수정을 확인했습니다.</label>}
+      {warns && <label><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 저장합니다.</label>}
     </section>}
     <div className="row-actions"><Button variant="outline" onClick={onClose}>닫기</Button><Button disabled={!ready} onClick={()=>{
       if (snapshot!==JSON.stringify(state)) {

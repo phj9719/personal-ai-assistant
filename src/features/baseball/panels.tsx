@@ -138,7 +138,7 @@ export function BaseballImport({data,onSave}:{data:Baseball;onSave:(games:Game[]
     {preview.length>0 && <ul aria-label="경기 가져오기 미리보기" className="rows baseball-preview">{preview.map(row=><li key={row.line}>
       <div><strong>{row.line}행 {row.game && row.game.date+" · "+gameName(row.game)}</strong><p>{row.error || row.warning || "등록 가능"}</p></div>
     </li>)}</ul>}
-    {conflicts && <label className="utility-checkbox"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>원본과 계산 결과의 차이를 확인했습니다.</label>}
+    {conflicts && <label><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>원본과 계산 결과의 차이를 확인했습니다.</label>}
     {preview.length>0 && <Button disabled={blocked} onClick={async ()=>{
       const games=preview.flatMap(row=>row.game ? [row.game] : []);
       const issue=await onSave(games);

@@ -128,7 +128,7 @@ export function RecordsView({module,records,today,theme,consumption,onChange,lin
       <label>이름<input autoFocus name="title" defaultValue={editing.title} required maxLength={100} onInput={event=>event.currentTarget.setCustomValidity("")}/></label>
       <label>분류<select name="group" defaultValue={editing.group}>{config.groups.map(item=><option key={item}>{item}</option>)}</select></label>
       <label>날짜<input name="date" type="date" defaultValue={editing.date} required/></label>
-      {module==="schedule" && <label className="utility-checkbox"><input name="completed" type="checkbox" defaultChecked={editing.completed}/>완료 일정</label>}
+      {module==="schedule" && <label><input name="completed" type="checkbox" defaultChecked={editing.completed}/>완료 일정</label>}
       {(module==="schedule" || module==="tasks") && <label>완료일 (미입력 시 오늘)<input name="completedOn" type="date" defaultValue={editing.completedOn ?? ""}/></label>}
       {config.unit && <label>수량 또는 금액 ({config.unit})<input name="amount" type="number" min={module === "finance" ? 1 : 0} max={999999999} defaultValue={editing.amount} required/></label>}
       <label>상세 내용<textarea name="detail" maxLength={1000} defaultValue={editing.detail}/></label>

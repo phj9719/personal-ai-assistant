@@ -26,8 +26,16 @@ h1 {font-size:clamp(1.7rem,4vw,2.4rem);letter-spacing:-.045em;font-weight:750;li
 h2 {font-size:1.15rem;font-weight:700;margin:0 0 14px}
 p {line-height:1.55}
 button,a,input,textarea,select {outline-offset:3px}
-input,select,textarea {border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:9px 11px;max-width:100%}
+input:not([type="checkbox"]),select,textarea {border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:9px 11px;max-width:100%}
 label {display:grid;gap:6px;font-size:.9rem;color:var(--muted)}
+label:has(> input[type="checkbox"]) {
+  display:flex;align-items:center;align-self:center;gap:8px;grid-column:1/-1;min-width:0;
+  line-height:1.4;word-break:keep-all;overflow-wrap:anywhere;cursor:pointer;
+}
+input[type="checkbox"] {
+  width:17px;height:17px;flex:none;margin:0;accent-color:var(--accent);cursor:pointer;
+}
+input[type="checkbox"]:disabled,label:has(> input[type="checkbox"]:disabled) {cursor:default}
 form:has(label) {display:grid;gap:13px}
 .button {display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:10px;padding:9px 13px;font-weight:650;font-size:.9rem;cursor:pointer;white-space:nowrap}
 .button:disabled {opacity:.45;cursor:default}
@@ -137,9 +145,7 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .utility-fields,.utility-charts {grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
 .utility-dialog {width:min(680px,calc(100% - 24px))}
 .utility-fields label {min-width:0}
-.utility-fields input,.utility-fields select {width:100%}
-.utility-checkbox {display:flex;align-items:center;gap:8px}
-.utility-checkbox input {flex:none}
+.utility-fields input:not([type="checkbox"]),.utility-fields select {width:100%}
 .utility-comparison {grid-template-columns:repeat(auto-fit,minmax(min(100%,175px),1fr));margin-top:12px}
 .utility-comparison > div {display:grid;gap:4px;border:1px solid var(--line);border-radius:12px;padding:12px}
 .utility-comparison span,.utility-comparison small,.utility-bill-heading span,.utility-group p span {color:var(--muted)}
@@ -184,7 +190,7 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .settlement-fields legend {padding-inline:5px;font-weight:600}
 .settlement-inline {grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));align-items:end}
 .settlement-inline label {min-width:0}
-.settlement-inline input,.settlement-inline select {width:100%;min-width:0}
+.settlement-inline input:not([type="checkbox"]),.settlement-inline select {width:100%;min-width:0}
 .settlement-case {display:grid;gap:8px;overflow-wrap:anywhere}
 .settlement-case > .button {justify-self:start}
 .settlement-case details summary {color:var(--accent);cursor:pointer}

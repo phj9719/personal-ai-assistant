@@ -123,7 +123,7 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
           return <li key={person.id}>
             <div><strong>{person.name}</strong><p>부담 {won(person.share)} · 입금 {won(paid)} · 남은 금액 {won(left)} · {paymentState(paid,left)}</p></div>
             <div className="row-actions">
-              {item.kind==="split" && <label className="utility-checkbox"><input type="checkbox" checked={left===0} disabled={person.share===0}
+              {item.kind==="split" && <label><input type="checkbox" checked={left===0} disabled={person.share===0}
                 onChange={()=>void togglePaid(item,person)}/>{person.name} 입금 완료</label>}
               <Button variant="outline" disabled={left===0} onClick={()=>setPayment({item,person})}>입금 기록</Button>
             </div>
