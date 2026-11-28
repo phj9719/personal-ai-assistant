@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { YearComparisonChart } from "./charts";
 import {
-  change, comparisonFields, metrics, monthlyBills, scopeNames, selectBills, shiftMonth, sumMoney, yearComparison,
+  change, comparisonFields, metrics, monthlyBills, scopeNames, selectBills, shiftMonth, sumMoney, validMonth, yearComparison,
   type Bill, type ComparisonKey, type Scope,
 } from "./model";
 
@@ -11,15 +13,20 @@ const format = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:3});
 const display = (value:number|null,unit:string)=>value===null ? "—" : format.format(value)+unit;
 const signed = (value:number|null,unit:string)=>value!==null && value>0 ? "+"+display(value,unit) : display(value,unit);
 
-export function UtilityComparison({bills,month,scope}:{bills:Bill[];month:string;scope:"all"|Scope}) {
+export function UtilityComparison({bills,currentMonth,scope}:{bills:Bill[];currentMonth:string;scope:"all"|Scope}) {
+  const [selectedMonth,setSelectedMonth] = useState<string|null>(null);
   const [basis,setBasis] = useState<"withoutParking"|"total">("withoutParking");
   const [chartMetric,setChartMetric] = useState<ComparisonKey|"basis">("basis");
   const index = monthlyBills(bills);
+  const initialYear = currentMonth.slice(0,4);
+  const month = selectedMonth ?? [...index.keys()].filter(key=>key.startsWith(initialYear)).sort().at(-1) ?? currentMonth;
+  const previousMonth = shiftMonth(month,-1);
+  const nextMonth = shiftMonth(month,1);
   const year = month.slice(0,4);
   const priorMonth = shiftMonth(month,-12);
   const current = selectBills(index.get(month) ?? [],scope);
   const prior = selectBills(index.get(priorMonth) ?? [],"all");
-  const previous = selectBills(index.get(shiftMonth(month,-1)) ?? [],scope);
+  const previous = selectBills(index.get(previousMonth) ?? [],scope);
   const currentValues = metrics(current);
   const lastYear = metrics(prior);
   const rows = yearComparison(index,year,scope,basis);
@@ -45,7 +52,19 @@ export function UtilityComparison({bills,month,scope}:{bills:Bill[];month:string
 
   return <>
     <section className="panel utility-year" aria-label="전년 동월 비교">
-      <h2>{month} 전년 동월 비교</h2>
+      <div className="utility-period-heading">
+        <h2>{month} 전년 동월 비교</h2>
+        <div className="utility-period-controls" role="group" aria-label="비교 기준 연월 변경">
+          <Button type="button" variant="outline" aria-label="이전 월" disabled={!validMonth(previousMonth)} onClick={()=>setSelectedMonth(previousMonth)}>
+            <ChevronLeft size={18} aria-hidden="true"/>
+          </Button>
+          <input type="month" aria-label="비교 기준 연월" min="1000-01" max="9999-12" value={month}
+            onChange={event=>{if (validMonth(event.target.value)) setSelectedMonth(event.target.value);}}/>
+          <Button type="button" variant="outline" aria-label="다음 월" disabled={!validMonth(nextMonth)} onClick={()=>setSelectedMonth(nextMonth)}>
+            <ChevronRight size={18} aria-hidden="true"/>
+          </Button>
+        </div>
+      </div>
       <label>관리비 합계 비교 기준<select value={basis} onChange={event=>setBasis(event.target.value as typeof basis)}>
         <option value="withoutParking">주차비 제외 관리비</option><option value="total">관리비 고지서 합계</option>
       </select></label>
@@ -53,7 +72,7 @@ export function UtilityComparison({bills,month,scope}:{bills:Bill[];month:string
         {([[month,current],["전월",previous],[priorMonth+" 전년 동월",prior]] as const).map(([label,group])=>{
           const value = metrics(group)[basis];
           return <div key={label}><span>{label} · {field.label}</span>
-            <strong>{group.length ? display(value,"원") : "비교 데이터 없음"}</strong>
+            <strong>{value===null ? "비교 데이터 없음" : display(value,"원")}</strong>
             {!!group.length && <small>{scopeNames[group[0].scope]}</small>}
           </div>;
         })}

@@ -216,6 +216,11 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .utility-year {min-width:0;display:grid;gap:10px;--utility-secondary:#17796b}
 [data-theme=dark] .utility-year {--utility-secondary:#82bdad}
 .utility-year label {width:fit-content;max-width:100%}
+.utility-period-heading {display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.utility-period-heading h2 {margin:0}
+.utility-period-controls {display:flex;align-items:center;gap:6px;min-width:0;max-width:100%}
+.utility-period-controls input {min-width:0}
+.utility-period-controls .button {width:40px;height:40px;flex:none;padding:0}
 .utility-year h3,.utility-gas-fields legend {font-weight:700}
 .utility-year-chart {min-width:0}
 .utility-gas-fields {margin-block:12px}

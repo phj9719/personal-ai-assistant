@@ -80,10 +80,10 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
   const visible = bills.filter(bill=>(!year || bill.month.startsWith(year)) && (!month || bill.month.endsWith(month)) && (scope==="all" || bill.scope===scope))
     .sort((a,b)=>b.month.localeCompare(a.month) || b.kind.localeCompare(a.kind));
   const aggregate = personalStatistics(visible);
-  const compared = year && month ? year+month : visible[0]?.month ?? (year ? year+(year===current.slice(0,4) ? current.slice(4) : "-12") : current);
+  const entryMonth = year && month ? year+month : visible[0]?.month ?? (year ? year+(year===current.slice(0,4) ? current.slice(4) : "-12") : current);
   function create(kind:Bill["kind"]) {
-    const type = scope==="all" ? withinResidence(compared,residence) ? "personal" : "reference" : scope;
-    setEditing({bill:blankBill(kind,compared,type)});
+    const type = scope==="all" ? withinResidence(entryMonth,residence) ? "personal" : "reference" : scope;
+    setEditing({bill:blankBill(kind,entryMonth,type)});
   }
   const grouped = monthlyBills(visible);
   return <>
@@ -111,7 +111,7 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
       <div className="panel stat"><span>조회 기간 본인 월평균</span><strong>{money(aggregate.average)}</strong></div>
       <div className="panel stat"><span>금액이 있는 본인 청구월</span><strong>{aggregate.months}개월</strong></div>
     </div>
-    <UtilityComparison bills={bills} month={compared} scope={scope}/>
+    <UtilityComparison bills={bills} currentMonth={current} scope={scope}/>
     <section className="panel">
       <h2>월별 상세 내역</h2>
       <p className="muted">—는 미청구 또는 미확인입니다. 확인분은 등록된 금액만 합산합니다.</p>
