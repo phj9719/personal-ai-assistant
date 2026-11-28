@@ -162,6 +162,7 @@ export function CaseForm({initial,cases,ledger,accounts,onSave,onClose}:{
 export function ReceiptForm({personId,initial,today,accounts,ledger,onSave,onClose}:{
   personId:string;initial?:Receipt;today:string;accounts:string[];ledger:Entry[];onSave:(row:Receipt)=>Promise<string>;onClose:()=>void;
 }) {
+  const [id] = useState(()=>initial?.id ?? newId());
   const [account,setAccount] = useState(initial?.account ?? "");
   const [entryId,setEntryId] = useState(initial?.entryId ?? "");
   const linked = ledger.find(row=>row.id===entryId);
@@ -172,7 +173,7 @@ export function ReceiptForm({personId,initial,today,accounts,ledger,onSave,onClo
     <form onSubmit={async event=>{
       event.preventDefault();
       const data=new FormData(event.currentTarget);
-      setError(await onSave({id:initial?.id ?? newId(),personId,date:valueOf(data,"date"),amount:number(valueOf(data,"amount")),
+      setError(await onSave({id,personId,date:valueOf(data,"date"),amount:number(valueOf(data,"amount")),
         account:account.trim(),note:valueOf(data,"note"),entryId:entryId || null}));
     }}>
       <label>기존 수입 연결<select value={entryId} onChange={event=>{
@@ -181,6 +182,8 @@ export function ReceiptForm({personId,initial,today,accounts,ledger,onSave,onClo
         if (entry) {setDate(entry.date);setAmount(String(entry.amount));}
       }}><option value="">직접 기록</option>{ledger.filter(row=>row.group==="수입" && Number.isInteger(row.amount) && row.amount>0)
         .map(row=><option key={row.id} value={row.id}>{row.date} · {row.title} · {won(row.amount)}</option>)}</select></label>
+      {linked && <p className="muted">연결된 입금의 날짜와 금액은 가계부 원본을 따릅니다. 다른 거래를 선택하거나 연결을 해제하면 변경할 수 있습니다.</p>}
+      {initial?.entryId && initial.entryId!==entryId && <p className="muted">연결을 바꾸면 기존 가계부 원본 거래는 유지되며 수입으로 다시 집계됩니다.</p>}
       <label>실제 입금일<input name="date" type="date" readOnly={!!linked} value={date} onChange={event=>setDate(event.target.value)} required/></label>
       <label>입금액 (원)<input name="amount" type="number" min="1" max="999999999" step="1" readOnly={!!linked} value={amount} onChange={event=>setAmount(event.target.value)} required/></label>
       <AccountInput label="입금계좌" value={account} accounts={accounts} onChange={setAccount}/>

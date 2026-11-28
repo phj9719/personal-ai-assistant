@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {balance,caseError,caseStatus,equalShares,installmentPlan,linkedError,openPlans,paymentState,peopleOf,personBalance,
-  receivableStats,shareText,type Advance,type Receipt,type Split} from "../src/features/settlements/model.ts";
+  receivableStats,received,repaymentProgress,saveReceipt,shareText,type Advance,type Receipt,type Split} from "../src/features/settlements/model.ts";
 import {financeStatistics} from "../src/features/finance/model.ts";
 import {emptyData} from "../src/features/workspace/data.ts";
 import type {Entry} from "../src/features/modules.ts";
@@ -56,6 +56,44 @@ test("generates monthly installments independently of card term and calculates a
   const undated={...advance,target:null,start:null,end:null,plans:[]};
   assert.equal(caseStatus(undated,"2024-03-01"),"예정일 미지정");
   assert.equal(peopleOf(undated)[0].share,9000);
+});
+
+test("edits advance receipts in place and reopens completed installments when a receipt is deleted",()=>{
+  const first=receipt("advance-first","advance",3000,"2024-02-01");
+  const second=receipt("advance-second","advance",5000,"2024-02-07");
+  const last={...second,amount:6000,date:"2024-02-08",account:"가상 변경 계좌",note:"가상 변경 메모"};
+  let n=0;
+  const plans=installmentPlan("2024-01-31","2024-04-30",3000,9000,()=>String(++n));
+  const initial={...advance,plans,receipts:[first,second]};
+  assert.equal(repaymentProgress(initial),88.8);
+  assert.equal(saveReceipt(initial,last,false),null);
+  assert.equal(saveReceipt(initial,{...last,id:"missing"},true),null);
+  const saved=saveReceipt(initial,last,true);
+  assert.ok(saved?.kind==="advance");
+  const done=saved;
+  assert.deepEqual(done.receipts,[first,last]);
+  assert.equal(caseStatus(done,"2024-02-08"),"상환 완료");
+  assert.deepEqual([received(done),balance(done),repaymentProgress(done)],[9000,0,100]);
+  const reopened={...done,receipts:done.receipts.filter(row=>row.id!==last.id)};
+  assert.equal(caseStatus(reopened,"2024-02-08"),"상환 중");
+  assert.deepEqual([received(reopened),balance(reopened),repaymentProgress(reopened)],[3000,6000,33.3]);
+  assert.deepEqual(openPlans(reopened).map(row=>row.amount),[0,3000,3000]);
+  assert.deepEqual(reopened.plans,plans);
+  const partial={...advance,receipts:[first],adjustments:[{id:"waive",date,amount:3000,kind:"waive" as const,note:""}]};
+  assert.equal(repaymentProgress(partial),66.6);
+});
+
+test("keeps a linked receipt consistent and counts its source once after deleting the link",()=>{
+  const entry=ledgerRow("advance-incoming",6000,"수입","2024-02-03");
+  const linked={...receipt("advance-linked","advance",6000,entry.date),entryId:entry.id};
+  const item={...advance,receipts:[linked]};
+  assert.equal(linkedError([item],[entry]),"");
+  assert.match(linkedError([{...item,receipts:[{...linked,amount:5000}]}],[entry]),/연결을 해제/);
+  assert.match(linkedError([{...item,receipts:[{...linked,id:"other"},linked]}],[entry]),/한 결제/);
+  const before=financeStatistics("2024-02",[],[],[entry],emptyData.utilities,[item]);
+  const after=financeStatistics("2024-02",[],[],[entry],emptyData.utilities,[{...item,receipts:[]}]);
+  assert.deepEqual([before.income,before.refunds,before.balance],[0,6000,6000]);
+  assert.deepEqual([after.income,after.refunds,after.balance],[6000,0,6000]);
 });
 
 test("links source records once, protects edits and separates card approval, cash and recovery",()=>{

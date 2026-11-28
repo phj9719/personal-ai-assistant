@@ -32,6 +32,17 @@ export const peopleOf = (item:Case):Person[]=>item.kind==="split" ? item.people 
 export const personBalance = (item:Case,person:Person)=>person.share-received(item,person.id)-adjusted(item);
 export const paymentState = (paid:number,left:number)=>left===0 ? "입금 완료" : paid>0 ? "부분 입금" : "미입금";
 
+export function repaymentProgress(item:Advance) {
+  const total = expected(item);
+  return total===0 ? 100 : Math.floor((total-balance(item))*1000/total)/10;
+}
+
+export function saveReceipt(item:Case,row:Receipt,editing:boolean) {
+  const exists = item.receipts.some(receipt=>receipt.id===row.id);
+  if (exists!==editing || (!editing && item.receipts.length>=500)) return null;
+  return {...item,receipts:editing ? item.receipts.map(receipt=>receipt.id===row.id ? row : receipt) : [...item.receipts,row]};
+}
+
 export function equalShares(total:number, count:number, unit:number) {
   const share = Math.floor(total/(count+1)/unit)*unit;
   return {share,own:total-share*count};

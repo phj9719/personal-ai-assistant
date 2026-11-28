@@ -193,6 +193,11 @@ header {height:66px;border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw
 .settlement-inline input:not([type="checkbox"]),.settlement-inline select {width:100%;min-width:0}
 .settlement-case {display:grid;gap:8px;overflow-wrap:anywhere}
 .settlement-case > .button {justify-self:start}
+.settlement-summary {margin-block:4px}
+.settlement-summary div {border:1px solid var(--line);border-radius:10px;padding:10px}
+.settlement-summary dt,.settlement-summary small {color:var(--muted);font-size:.84rem}
+.settlement-summary dd,.settlement-receipts h3 {font-weight:700}
+.settlement-receipts {min-width:0}
 .settlement-case details summary {color:var(--accent);cursor:pointer}
 .finance-tabs [aria-pressed=true] {background:var(--tint);color:var(--accent);font-weight:700}
 

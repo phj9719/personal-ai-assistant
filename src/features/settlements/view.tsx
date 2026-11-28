@@ -7,12 +7,43 @@ import type {Entry} from "../modules";
 import {AdjustmentForm,CaseForm,emptyCase,newId,ReceiptForm} from "./forms";
 import {
   adjusted,adjustmentKinds,balance,caseError,caseStatus,expected,linkedError,openPlans,paymentState,peopleOf,personBalance,principal,
-  paymentKinds,receivableStats,received,repaymentKinds,shareText,won,type Case,type Person,type Receipt,type Settlements,
+  paymentKinds,receivableStats,received,repaymentKinds,repaymentProgress,saveReceipt,shareText,won,type Advance,type Case,type Person,type Receipt,type Settlements,
 } from "./model";
 
 const sections = ["일반 정산","대납금 관리","입금 이력","미수금 현황"] as const;
 type PaymentEditor = {item:Case;person:Person;receipt?:Receipt};
 type Removal = {title:string;description:string;apply:()=>Promise<boolean>};
+
+function ReceiptList({rows,showCase,onEdit,onDelete}:{rows:{item:Case;row:Receipt}[];showCase?:boolean;
+  onEdit:(item:Case,person:Person,row:Receipt)=>void;onDelete:(item:Case,row:Receipt)=>void;
+}) {
+  if (!rows.length) return <p className="empty">{showCase ? "조회 조건에 맞는 입금이 없습니다." : "표시할 입금 기록이 없습니다."}</p>;
+  return <ul className="rows finance-rows">{rows.map(({item,row})=>{
+    const person = peopleOf(item).find(person=>person.id===row.personId);
+    return person && <li key={row.id}>
+      <div>
+        {showCase && <strong>{item.title} · {person.name}</strong>}
+        <p><time dateTime={row.date}>{row.date}</time> · {won(row.amount)} · {row.account || "입금계좌 미지정"}{row.entryId && " · 기존 거래 연결"}</p>
+        {row.note && <p>{row.note}</p>}
+      </div>
+      <div className="row-actions">
+        <Button variant="outline" onClick={()=>onEdit(item,person,row)}>입금 수정</Button>
+        <Button variant="ghost" onClick={()=>onDelete(item,row)}>{showCase ? "입금 취소" : "입금 삭제"}</Button>
+      </div>
+    </li>;
+  })}</ul>;
+}
+
+function AdvanceSummary({item}:{item:Advance}) {
+  const progress = repaymentProgress(item);
+  return <dl className="stats settlement-summary">
+    <div><dt>전체 대납금</dt><dd>{won(principal(item))}</dd></div>
+    <div><dt>누적 입금액</dt><dd>{won(received(item))}</dd></div>
+    <div><dt>남은 대납금</dt><dd>{won(balance(item))}</dd></div>
+    <div><dt>상환 진행률</dt><dd>{progress}%{adjusted(item)>0 && <small> · 잔액 조정 반영</small>}</dd></div>
+    <div><dt>완납 여부</dt><dd>{balance(item)===0 ? "완납" : "미완납"}</dd></div>
+  </dl>;
+}
 
 export function SettlementsView({cases,save,ledger,accounts,today}:{
   cases:Settlements;save:Save<Settlements>;ledger:Entry[];accounts:string[];today:string;
@@ -26,6 +57,7 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
   const [editing,setEditing] = useState<Case|null>(null);
   const [payment,setPayment] = useState<PaymentEditor|null>(null);
   const [adjusting,setAdjusting] = useState<Case|null>(null);
+  const [receiptRemoval,setReceiptRemoval] = useState<{caseId:string;receiptId:string}|null>(null);
   const [remove,setRemove] = useState<Removal|null>(null);
   const [share,setShare] = useState("");
   const [notice,setNotice] = useState("");
@@ -42,17 +74,29 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
     const existing = cases.some(item=>item.id===next.id);
     return save(existing ? cases.map(item=>item.id===next.id ? next : item) : [next,...cases]);
   }
+  const removalCase = cases.find(item=>item.id===receiptRemoval?.caseId);
+  const removalReceipt = removalCase?.receipts.find(row=>row.id===receiptRemoval?.receiptId);
   async function recordReceipt(row:Receipt) {
     if (!payment) return "";
-    const next = {...payment.item,receipts:[...payment.item.receipts.filter(item=>item.id!==row.id),row]};
+    const item = cases.find(item=>item.id===payment.item.id);
+    if (!item) return "대상 내역을 찾을 수 없습니다.";
+    if (payment.receipt && JSON.stringify(item.receipts.find(receipt=>receipt.id===row.id))!==JSON.stringify(payment.receipt)) {
+      return "입금 기록이 변경되었습니다. 편집을 닫고 최신 기록을 확인해 주세요.";
+    }
+    const next = saveReceipt(item,row,!!payment.receipt);
+    if (!next) return "입금 기록은 중복 없이 최대 500건까지 등록할 수 있습니다.";
     const issue = caseError(next) || linkedError(cases.map(item=>item.id===next.id ? next : item),ledger);
     if (issue) return issue;
-    if (await commit(next)) setPayment(null);
+    if (!await commit(next)) return "입금을 저장하지 못했습니다. 최신 내역을 확인한 뒤 다시 시도해 주세요.";
+    setPayment(null);
+    setNotice(payment.receipt ? "입금 기록을 수정했습니다." : "입금 기록을 등록했습니다.");
     return "";
   }
   function removeReceipt(item:Case,row:Receipt) {
-    setRemove({title:"입금 취소",description:row.date+"에 기록한 "+won(row.amount)+" 입금을 취소할까요?",
-      apply:()=>commit({...item,receipts:item.receipts.filter(receipt=>receipt.id!==row.id)})});
+    setReceiptRemoval({caseId:item.id,receiptId:row.id});
+  }
+  function editReceipt(item:Case,person:Person,receipt:Receipt) {
+    setPayment({item,person,receipt});
   }
   async function togglePaid(item:Case,person:Person) {
     const outstanding=personBalance(item,person);
@@ -96,11 +140,14 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
             })} aria-label={item.title+" 삭제"}>삭제</Button>
           </div>
         </div>
-        <p>결제 {won(principal(item))} · 본인 부담 {won(item.own)} · 받을 금액 {won(expected(item))}{item.kind==="advance" && item.target===null ? " (미확정)" : ""}</p>
-        <p>받은 금액 {won(received(item))} · 남은 미수금 {won(balance(item))}</p>
+        {item.kind==="advance" ? <AdvanceSummary item={item}/> : <>
+          <p>결제 {won(principal(item))} · 본인 부담 {won(item.own)} · 받을 금액 {won(expected(item))}</p>
+          <p>받은 금액 {won(received(item))} · 남은 미수금 {won(balance(item))}</p>
+        </>}
         {item.note && <p className="muted">{item.note}</p>}
         {item.kind==="split" && item.due && <p className="muted">입금 예정일 {item.due}</p>}
         {item.kind==="advance" && <>
+          <p>본인 부담 {won(item.own)} · 받을 금액 {won(expected(item))}{item.target===null ? " (미확정)" : ""}</p>
           <p>{repaymentKinds[item.repayment]} · 상환 기간 {item.start ?? "미지정"} ~ {item.end ?? "미지정"}</p>
           <p>카드 결제 {item.cardInstallments===null ? "할부 정보 미지정" : item.cardInstallments===1 ? "일시불" : item.cardInstallments+"개월 할부"} · 잔액 조정 {won(adjusted(item))}</p>
           <details><summary>상환 회차 및 조정 내역</summary>
@@ -121,7 +168,7 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
         <ul className="rows finance-rows">{peopleOf(item).map(person=>{
           const left=personBalance(item,person), paid=received(item,person.id);
           return <li key={person.id}>
-            <div><strong>{person.name}</strong><p>부담 {won(person.share)} · 입금 {won(paid)} · 남은 금액 {won(left)} · {paymentState(paid,left)}</p></div>
+            <div><strong>{person.name}</strong>{item.kind==="split" && <p>부담 {won(person.share)} · 입금 {won(paid)} · 남은 금액 {won(left)} · {paymentState(paid,left)}</p>}</div>
             <div className="row-actions">
               {item.kind==="split" && <label><input type="checkbox" checked={left===0} disabled={person.share===0}
                 onChange={()=>void togglePaid(item,person)}/>{person.name} 입금 완료</label>}
@@ -129,18 +176,15 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
             </div>
           </li>;
         })}</ul>
+        {item.kind==="advance" && <section className="settlement-receipts" aria-label={item.title+" 입금 기록"}>
+          <h3>입금 기록</h3>
+          <ReceiptList rows={[...item.receipts].sort((a,b)=>b.date.localeCompare(a.date)).map(row=>({item,row}))}
+            onEdit={editReceipt} onDelete={removeReceipt}/>
+        </section>}
       </section>,
     )}{!matching.some(item=>item.kind===(section===0 ? "split" : "advance")) && <p className="empty">조회 조건에 맞는 내역이 없습니다.</p>}</div>}
     {section===2 && <section className="panel"><h2>입금 이력</h2>
-      {!history.length && <p className="empty">조회 조건에 맞는 입금이 없습니다.</p>}
-      <ul className="rows finance-rows">{history.map(({item,row})=>{
-        const person=peopleOf(item).find(person=>person.id===row.personId);
-        return person && <li key={row.id}><div><strong>{item.title} · {person.name}</strong>
-          <p>{row.date} · {won(row.amount)} · {row.account || "입금계좌 미지정"}{row.entryId && " · 기존 거래 연결"}</p>{row.note && <p>{row.note}</p>}</div>
-          <div className="row-actions"><Button variant="outline" onClick={()=>setPayment({item,person,receipt:row})}>입금 수정</Button>
-            <Button variant="ghost" onClick={()=>removeReceipt(item,row)}>입금 취소</Button></div>
-        </li>;
-      })}</ul>
+      <ReceiptList rows={history} showCase onEdit={editReceipt} onDelete={removeReceipt}/>
     </section>}
     {section===3 && <>
       <label>통계 조회 월<input type="month" value={month} onChange={event=>setMonth(event.target.value)}/></label>
@@ -165,6 +209,20 @@ export function SettlementsView({cases,save,ledger,accounts,today}:{
       if (await commit(next)) setAdjusting(null);
       return "";
     }}/>}
+    {receiptRemoval && <dialog className="dialog" aria-labelledby="receipt-remove-title" ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setReceiptRemoval(null)}>
+      <h2 id="receipt-remove-title">{removalCase?.kind==="advance" ? "입금 삭제" : "입금 취소"}</h2>
+      {removalReceipt ? <p>{removalReceipt.date}에 기록한 {won(removalReceipt.amount)} 입금을 삭제할까요?</p> : <p>삭제할 입금 기록이 없습니다.</p>}
+      {removalReceipt?.entryId && <p className="muted">가계부 원본 거래는 유지되며 수입으로 다시 집계됩니다.</p>}
+      <div className="row-actions">
+        <Button variant="outline" onClick={()=>setReceiptRemoval(null)}>닫기</Button>
+        {removalCase && removalReceipt && <Button onClick={async ()=>{
+          if (await commit({...removalCase,receipts:removalCase.receipts.filter(receipt=>receipt.id!==removalReceipt.id)})) {
+            setNotice("입금 기록을 삭제했습니다.");
+          }
+          setReceiptRemoval(null);
+        }}>확인</Button>}
+      </div>
+    </dialog>}
     {remove && <dialog className="dialog" aria-labelledby="settlement-confirm" ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setRemove(null)}>
       <h2 id="settlement-confirm">{remove.title}</h2><p>{remove.description}</p>
       <div className="row-actions"><Button variant="outline" onClick={()=>setRemove(null)}>닫기</Button><Button onClick={async ()=>{if (await remove.apply()) setRemove(null);}}>확인</Button></div>
