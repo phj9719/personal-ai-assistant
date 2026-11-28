@@ -68,25 +68,28 @@ test("requires acknowledgement only for changed actual bills outside residence a
   assert.equal(replaceBills(old.bills,[{...reference,total:9000}]).length,2);
 });
 
-test("uses parking only once in the breakdown and never modifies the invoice",()=>{
-  const bill = {...management("2026-02",75000),electricity:8000,sharedElectricity:-500,water:5000,base:60000,parking:5000};
-  const inBase = {...bill,parkingInBase:true};
-  assert.deepEqual(managementBreakdown(bill),{subtotal:80000,complete:true,difference:-5000});
-  assert.deepEqual(managementBreakdown(inBase),{subtotal:75000,complete:true,difference:0});
-  assert.equal(metrics([inBase]).total,75000);
-  assert.equal(metrics([inBase]).withoutParking,70000);
-  assert.equal(metrics([{...bill,parking:0}]).withoutParking,75000);
-  assert.equal(metrics([{...bill,parking:undefined}]).withoutParking,null);
+test("keeps parking informational and uses invoice totals regardless of the old flag",()=>{
+  const bill = {...management("2026-02",75000),electricity:8000,sharedElectricity:-500,water:5000,base:60000};
   const gas:Bill = {kind:"gas",month:bill.month,scope:"personal",gas:15000,start:null,end:null,note:""};
-  assert.equal(metrics([inBase,gas]).housing,90000);
-  assert.equal(metrics([inBase,gas]).housingWithoutParking,85000);
-  assert.equal(metrics([inBase]).housingWithoutParking,null);
+  for (const parking of [0,5000,null,undefined]) {
+    const row = {...bill,parking};
+    assert.deepEqual(managementBreakdown(row),{subtotal:75000,complete:true,difference:0});
+    const legacy = {...row,parkingInBase:true};
+    assert.deepEqual(managementBreakdown(legacy),managementBreakdown(row));
+    const values = metrics([legacy,gas]);
+    assert.equal(values.parking,parking ?? null);
+    assert.equal(values.total,75000);
+    assert.equal(values.housing,90000);
+    assert.deepEqual(personalStatistics([legacy,gas]),{total:90000,average:90000,months:1});
+  }
+  assert.equal(needsResidenceConfirmation({bills:[bill],residence},{bills:[{...bill,parking:0}],residence}),false);
+  assert.equal(metrics([bill]).housing,null);
 });
 
 test("compares the matching prior month, prefers actual records, and counts only paired months for annual totals",()=>{
   const bills = [
-    {...management("2026-02",75000),parking:5000,electricityUsage:80},
-    {...management("2025-02",65000),parking:5000,electricityUsage:100},
+    {...management("2026-02",75000),parking:null,electricityUsage:80},
+    {...management("2025-02",65000),parking:4000,electricityUsage:100},
     {...management("2025-02",90000,"reference"),parking:5000},
     {...management("2026-03",87000),parking:0},
     {...management("2025-03",70000,"reference"),parking:0},
@@ -100,9 +103,10 @@ test("compares the matching prior month, prefers actual records, and counts only
   assert.deepEqual(change(5,0),{difference:5,rate:null});
   assert.deepEqual(change(0,null),{difference:null,rate:null});
   assert.equal(change(7.2,6.1).difference,1.1);
-  assert.deepEqual(yearComparison(index,"2026","all","withoutParking").filter(row=>row.current!==null && row.previous!==null),[
-    {month:"02월",current:70000,previous:60000},{month:"03월",current:87000,previous:70000},
+  assert.deepEqual(yearComparison(index,"2026","all","total").filter(row=>row.current!==null && row.previous!==null),[
+    {month:"02월",current:75000,previous:65000},{month:"03월",current:87000,previous:70000},
   ]);
+  assert.deepEqual(yearComparison(index,"2026","all","parking")[1],{month:"02월",current:null,previous:4000});
 });
 
 test("previews spreadsheet, Markdown and CSV rows without treating past data as personal",()=>{
@@ -122,10 +126,12 @@ test("previews spreadsheet, Markdown and CSV rows without treating past data as 
   assert.ok(duplicate[1].errors.length);
   const invalid = importBills("청구월,구분,사용 구분,가스요금\n2026-03,가스비,본인 사용 내역,-1",[],residence);
   assert.equal(invalid[0].errors.length,1);
-  const withParking = importBills("청구월,데이터 유형,주차비,관리비 고지서 합계,기본 관리비에 주차비 포함,가스비 사용 기간\n2025-04,참고용 관리비,0,12000,예,2025-03-01 ~ 2025-04-01",[],residence);
+  const withParking = importBills("청구월,데이터 유형,주차비,관리비 고지서 합계,기본 관리비에 주차비 포함,가스비 사용 기간\n2025-04,참고용 관리비,0,12000,이전 양식,2025-03-01 ~ 2025-04-01",[],residence);
   const [invoice,gas] = withParking.map(row=>row.bill);
   assert.equal(invoice?.kind==="management" && invoice.parking,0);
-  assert.equal(invoice?.kind==="management" && invoice.parkingInBase,true);
+  assert.equal(invoice?.kind==="management" && invoice.total,12000);
+  assert.deepEqual(withParking.map(row=>row.errors),[[],[]]);
+  assert.doesNotMatch(exportBills(withParking.map(row=>row.bill!)),/기본 관리비에 주차비 포함/);
   assert.equal(gas?.kind==="gas" && gas.start,"2025-03-01");
   assert.equal(withParking[1].warnings.length,0);
   const bulk = importBills("청구월,사용 구분,주차비,관리비 합계\n2025-04,참고용 내역,,12000",[],residence,"personal");

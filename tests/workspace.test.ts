@@ -29,6 +29,10 @@ test("accepts browser datasets and rejects duplicate or invalid expenses and bil
   assert.equal(parseDocument("utilities",{...utility,bills:[{...bills[0],parking:-1}]}).success,false);
   const legacy = Object.fromEntries(Object.entries(bills[0]).filter(([key])=>key!=="parking" && key!=="parkingInBase"));
   assert.ok(parseDocument("utilities",{...utility,bills:[legacy]}).success);
+  const oldPayload = {...utility,bills:[{...legacy,parkingInBase:true,parking:6000}]};
+  const read = parseDocument("utilities",oldPayload);
+  assert.ok(read.success);
+  assert.deepEqual(read.data,oldPayload);
   assert.ok(writeRequest.safeParse({domain:"utilities",revision:0,value:utility,confirmedOutsideResidence:true}).success);
 });
 

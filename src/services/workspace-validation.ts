@@ -67,7 +67,9 @@ const billBase = {month,scope:z.enum(["personal","reference"]),note:description}
 const bill = z.discriminatedUnion("kind",[
   z.strictObject({...billBase,kind:z.literal("management"),electricityUsage:quantity.nullable(),electricity:money.nullable(),
     sharedElectricity:decimal(999999999999.99,2,-999999999999.99).nullable(),television:money.nullable(),
-    waterUsage:quantity.nullable(),water:money.nullable(),base:money.nullable(),parking:money.nullable().optional(),parkingInBase:z.boolean().optional(),total:money.nullable()}),
+    waterUsage:quantity.nullable(),water:money.nullable(),base:money.nullable(),parking:money.nullable().optional(),total:money.nullable(),
+    // Retain the old marker when validating existing workspace payloads and JSON backups.
+    parkingInBase:z.boolean().optional()}),
   z.strictObject({...billBase,kind:z.literal("gas"),gas:money.nullable(),start:date.nullable(),end:date.nullable()}),
 ]);
 const utilities = z.strictObject({residence,bills:z.array(bill).max(12000)})

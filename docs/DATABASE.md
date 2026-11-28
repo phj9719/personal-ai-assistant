@@ -43,9 +43,9 @@
 
 ## 월별 관리비와 가스비
 
-현재 운영 화면은 `workspace_documents`의 사용자별 `utilities` 도메인에 청구를 저장한다. 청구월·청구 종류(관리비, 가스비)·데이터 유형(실제, 참고용)의 조합은 도메인에서 유일하다. `parking`은 선택적 숫자이며 기존 데이터의 없는 키와 NULL을 모두 미확인으로 읽는다. `parkingInBase`는 기본 관리비에 주차비가 포함된 경우의 세부 합계 계산에 사용한다. 주차비 제외 금액 및 전년 동월 비교 값은 조회 시 계산한다. 고지서 원본과 가스 금액을 보존한다.
+현재 운영 화면은 `workspace_documents`의 사용자별 `utilities` 도메인에 청구를 저장한다. 청구월·청구 종류(관리비, 가스비)·데이터 유형(실제, 참고용)의 조합은 도메인에서 유일하다. `parking`은 선택적 숫자이며 기존 데이터의 없는 키와 NULL을 모두 미확인으로 읽는다. 비교·통계는 고지서 원본 합계를 사용한다. 기존 JSON의 `parkingInBase`는 호환성을 위해 수용한다. 과거 CSV의 주차비 포함 여부 열도 읽을 수 있으며 금액 계산에 반영하지 않는다.
 
-초기 정규화 스키마의 `utility_bills`, `utility_bill_items`, `user_settings`는 유지한다. `009_utility_parking.sql`은 관계형 월별 청구의 유일 키에 `usage_scope`를 포함하고 기본 관리비에 포함된 주차비를 나타내는 `parking_in_base`를 추가한다. 정규화 항목으로 이관 시 주차비는 기존 `utility_bill_items.item_code`의 `parking`으로 표현할 수 있다. 신규 테이블이나 기존 행의 재분류는 필요하지 않다. 참고용 청구의 가계부 거래 연결 제한은 유지한다.
+초기 정규화 스키마의 `utility_bills`, `utility_bill_items`, `user_settings`는 유지한다. `009_utility_parking.sql`은 관계형 월별 청구의 유일 키에 `usage_scope`를 포함하고 기본 관리비에 포함된 주차비를 나타내는 `parking_in_base`를 추가한다. 정규화 항목으로 이관 시 주차비는 기존 `utility_bill_items.item_code`의 `parking`으로 표현할 수 있다. 기존 `parking_in_base` 열은 보존한다. 이번 계산 기준 변경에는 신규 마이그레이션이 없다. 참고용 청구의 가계부 거래 연결 제한은 유지한다.
 
 API는 사용자 소유 잠금과 문서 리비전을 사용한다. 같은 거주 기간 판정으로 입력 및 일괄 가져오기를 검증하며, 거주 기간 밖에 실제 청구를 추가·수정하면 확인을 받는다. 가계부의 연결 조회는 실제 청구의 원본 금액만 읽는다.
 

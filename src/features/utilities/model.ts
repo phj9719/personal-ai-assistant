@@ -11,7 +11,7 @@ export const managementFields = {
 } as const;
 export type ManagementKey = keyof typeof managementFields;
 export const managementKeys = Object.keys(managementFields) as ManagementKey[];
-type ManagementAmounts = Record<Exclude<ManagementKey,"parking">, number | null> & {parking?:number|null; parkingInBase?:boolean};
+type ManagementAmounts = Record<Exclude<ManagementKey,"parking">, number | null> & {parking?:number|null};
 export type Scope = "personal" | "reference";
 type BillBase = {month:string; scope:Scope; note:string};
 export type ManagementBill = BillBase & {kind:"management"} & ManagementAmounts;
@@ -28,7 +28,7 @@ export function blankBill(kind: Bill["kind"], month: string, scope: Scope): Bill
   const base = {month,scope,note:""};
   return kind === "gas" ? {...base,kind,gas:null,start:null,end:null} : {
     ...base,kind,electricityUsage:null,electricity:null,sharedElectricity:null,television:scope==="personal" ? 2500 : null,
-    waterUsage:null,water:null,base:null,parking:null,parkingInBase:false,total:null,
+    waterUsage:null,water:null,base:null,parking:null,total:null,
   };
 }
 
@@ -83,7 +83,7 @@ export function needsResidenceConfirmation(previous:UtilityState|undefined,next:
     const old = existing.get(billKey(bill));
     if (!old || old.kind!==bill.kind || old.note!==bill.note) return true;
     return bill.kind==="management" && old.kind==="management"
-      ? managementKeys.some(key=>(old[key] ?? null)!==(bill[key] ?? null)) || !!old.parkingInBase!==!!bill.parkingInBase
+      ? managementKeys.some(key=>(old[key] ?? null)!==(bill[key] ?? null))
       : bill.kind==="gas" && old.kind==="gas" && (old.gas!==bill.gas || old.start!==bill.start || old.end!==bill.end);
   });
 }
@@ -121,7 +121,6 @@ export function sumMoney(values:(number|null)[]) {
 
 export function managementBreakdown(bill:ManagementBill) {
   const parts = [bill.electricity,bill.sharedElectricity,bill.television,bill.water,bill.base];
-  if (!bill.parkingInBase) parts.push(bill.parking ?? null);
   const subtotal = sumMoney(parts);
   return {
     subtotal, complete:parts.every(value=>value !== null),
@@ -176,10 +175,8 @@ export function comparison(bills:Bill[], month:string, allowReference:boolean) {
 
 export const comparisonFields = {
   ...managementFields,
-  withoutParking:{label:"주차비 제외 관리비",unit:"원"},
   gas:{label:"가스요금",unit:"원"},
   housing:{label:"전체 주거비",unit:"원"},
-  housingWithoutParking:{label:"주차비 제외 전체 주거비",unit:"원"},
 } as const;
 
 export type ComparisonKey = keyof typeof comparisonFields;
@@ -189,13 +186,11 @@ export function metrics(bills:Bill[]):Record<ComparisonKey,number|null> {
   const gas = bills.find(bill=>bill.kind==="gas")?.gas ?? null;
   const total = management?.total ?? null;
   const parking = management?.parking ?? null;
-  const withoutParking = total===null || parking===null ? null : sumMoney([total,-parking]);
   return {
     electricityUsage:management?.electricityUsage ?? null,electricity:management?.electricity ?? null,
     sharedElectricity:management?.sharedElectricity ?? null,television:management?.television ?? null,
     waterUsage:management?.waterUsage ?? null,water:management?.water ?? null,base:management?.base ?? null,
-    parking,total,withoutParking,gas,housing:total===null || gas===null ? null : sumMoney([total,gas]),
-    housingWithoutParking:withoutParking===null || gas===null ? null : sumMoney([withoutParking,gas]),
+    parking,total,gas,housing:total===null || gas===null ? null : sumMoney([total,gas]),
   };
 }
 

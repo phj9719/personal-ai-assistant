@@ -7,7 +7,7 @@ import {
 const labels = {
   month:"청구월",kind:"구분",scope:"데이터 유형",
   ...Object.fromEntries(managementKeys.map(key=>[key,managementFields[key].label])),
-  parkingInBase:"기본 관리비에 주차비 포함",gas:"가스요금",start:"가스비 사용 시작일",end:"가스비 사용 종료일",note:"비고",
+  gas:"가스요금",start:"가스비 사용 시작일",end:"가스비 사용 종료일",note:"비고",
 } as Record<string,string>;
 const gasKeys = ["gas","start","end","period"];
 const names = new Map(Object.entries(labels).flatMap(([key,label])=>[[key.toLowerCase(),key],[label,key]]));
@@ -53,7 +53,7 @@ export function importBills(source:string,existing:Bill[],residence:Residence,bu
     const rowScope = rawScope === "personal" || rawScope === scopeNames.personal || rawScope === "본인 사용 내역" ? "personal" :
       rawScope === "reference" || rawScope === scopeNames.reference || rawScope === "참고용 내역" ? "reference" : undefined;
     if (!bulkScope && rawScope && !rowScope) return invalid("데이터 유형은 실제 관리비 또는 참고용 관리비여야 합니다.");
-    const hasManagement = [...managementKeys,"parkingInBase"].some(key=>Boolean(data.get(key)));
+    const hasManagement = managementKeys.some(key=>Boolean(data.get(key)));
     const hasGas = gasKeys.some(key=>Boolean(data.get(key)));
     let kinds:Bill["kind"][];
     if (rawKind) {
@@ -86,12 +86,6 @@ export function importBills(source:string,existing:Bill[],residence:Residence,bu
           try { bill[field] = parseNumber(data.get(field) ?? "",unit,field==="sharedElectricity"); }
           catch (error) { errors.push(label+" · "+(error as Error).message); }
         }
-        if (data.has("parkingInBase")) {
-          const flag = (data.get("parkingInBase") ?? "").toLowerCase();
-          if (["예","true","1"].includes(flag)) bill.parkingInBase = true;
-          else if (["","아니오","아니요","false","0"].includes(flag)) bill.parkingInBase = false;
-          else errors.push("기본 관리비에 주차비 포함은 예 또는 아니오로 입력해 주세요.");
-        }
       } else {
         const period = data.get("period");
         if (period) {
@@ -114,7 +108,6 @@ export function exportBills(bills:Bill[]) {
   return "\uFEFF"+Papa.unparse([Object.values(labels),...bills.map(bill=>fields.map(key=>{
     if (key === "kind") return kindNames[bill.kind];
     if (key === "scope") return scopeNames[bill.scope];
-    if (key === "parkingInBase") return bill.kind==="management" && bill.parkingInBase ? "예" : "";
     if (key === "note") return /^[=+\-@\t\r＝＋－＠]/.test(bill.note) ? "'"+bill.note : bill.note;
     return bill[key as keyof typeof bill] ?? "";
   }))]);

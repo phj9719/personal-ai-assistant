@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { billKey, blankBill, housing, kindNames, managementBreakdown, managementFields, managementKeys,
-  metrics, missing, monthlyBills, personalStatistics, replaceBills, scopeNames, validDate, withinResidence,
+  missing, monthlyBills, personalStatistics, replaceBills, scopeNames, validDate, withinResidence,
   type Bill, type Residence, type Scope, type UtilityState } from "./model";
 import { UtilityCharts } from "./charts";
 import { UtilityComparison } from "./comparison";
@@ -51,10 +51,6 @@ function BillDetails({bill}:{bill:Bill}) {
         <tr><th scope="row">가스요금</th><td>{money(bill.gas)}</td></tr>
         <tr><th scope="row">사용 시작일</th><td>{bill.start ?? missing}</td></tr>
         <tr><th scope="row">사용 종료일</th><td>{bill.end ?? missing}</td></tr>
-      </>}
-      {bill.kind==="management" && <>
-        {bill.parkingInBase && <tr><th scope="row">주차비 처리</th><td>기본 관리비에 포함</td></tr>}
-        <tr><th scope="row">주차비 제외 관리비</th><td>{bill.parking==null ? "주차비 미입력" : money(metrics([bill]).withoutParking)}</td></tr>
       </>}
       {breakdown && <>
         <tr><th scope="row">세부 항목 합계{breakdown.complete ? "" : " (확인분)"}</th><td>{money(breakdown.subtotal)}</td></tr>

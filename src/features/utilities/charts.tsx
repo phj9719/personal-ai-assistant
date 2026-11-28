@@ -5,14 +5,14 @@ import { comparisonFields, metrics as billMetrics, monthlyBills, scopeNames, typ
 
 const series = {
   electricityUsage:"전기 사용량 (kWh)", electricity:"전기요금 (원)", waterUsage:"수도 사용량 (㎥)", water:"수도요금 (원)",
-  gas:"가스요금 (원)", total:"관리비 고지서 합계 (원)", withoutParking:"주차비 제외 관리비 (원)", housing:"총 주거비 (원)",
+  gas:"가스요금 (원)", total:"관리비 고지서 합계 (원)", housing:"총 주거비 (원)",
 };
 type Metric = keyof typeof series;
 const charts: {title:string; metrics:Metric[]; usage?:Metric}[] = [
   {title:"전기 사용량과 요금",metrics:["electricityUsage","electricity"],usage:"electricityUsage"},
   {title:"수도 사용량과 요금",metrics:["waterUsage","water"],usage:"waterUsage"},
   {title:"가스비",metrics:["gas"]},
-  {title:"관리비와 총 주거비",metrics:["total","withoutParking","housing"]},
+  {title:"관리비와 총 주거비",metrics:["total","housing"]},
 ];
 
 export function YearComparisonChart({rows,year,metric}:{rows:{month:string;current:number|null;previous:number|null}[];year:string;metric:ComparisonKey}) {

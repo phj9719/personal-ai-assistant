@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportBills, importBills } from "./import";
-import { kindNames, managementFields, needsResidenceConfirmation, replaceBills, scopeNames, type Bill, type UtilityState, type Scope } from "./model";
+import { kindNames, managementFields, managementKeys, needsResidenceConfirmation, replaceBills, scopeNames, type Bill, type UtilityState, type Scope } from "./model";
 
 export function downloadBills(bills:Bill[]) {
   const url = URL.createObjectURL(new Blob([exportBills(bills)],{type:"text/csv;charset=utf-8"}));
@@ -77,10 +77,10 @@ export function ImportPanel({state,onImport,onClose}:{state:UtilityState;onImpor
         <strong>{line}행 {bill && bill.month+" · "+kindNames[bill.kind]+" · "+scopeNames[bill.scope]}</strong>
         <span>{errors.length ? errors.join(" / ") : duplicate ? "기존 내역 수정" : "새로 등록"}</span>
         {!!warnings.length && <small className="utility-errors">{warnings.join(" ")}</small>}
-        {bill && <small>{Object.entries(bill).filter(([key])=>!["kind","month","scope","note"].includes(key)).map(([key,value])=>[
-          managementFields[key as keyof typeof managementFields]?.label ?? ({parkingInBase:"기본 관리비에 주차비 포함",gas:"가스요금",start:"가스 시작일",end:"가스 종료일"} as Record<string,string>)[key],
-          typeof value==="boolean" ? (value ? "예" : "아니오") : value ?? "—",
-        ].join(" ")).join(" · ")}{bill.note && " · 비고 "+bill.note}</small>}
+        {bill && <small>{(bill.kind==="management"
+          ? managementKeys.map(key=>[managementFields[key].label,bill[key]])
+          : [["가스요금",bill.gas],["가스 시작일",bill.start],["가스 종료일",bill.end]]
+        ).map(([label,value])=>label+" "+(value ?? "—")).join(" · ")}{bill.note && " · 비고 "+bill.note}</small>}
       </li>)}</ul>
       {duplicate && <label><input type="checkbox" checked={confirm} onChange={event=>setConfirm(event.target.checked)}/>청구월·청구 종류·데이터 유형이 같은 기존 내역 수정을 확인했습니다.</label>}
       {warns && <label><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 저장합니다.</label>}

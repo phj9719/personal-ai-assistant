@@ -42,7 +42,6 @@ export function BillEditor({bill,originalKey,bills,residence,onSave,onClose}:{
           try { next[key] = parseNumber(get(key),unit,key==="sharedElectricity"); }
           catch (error) { issues.push(label+" · "+(error as Error).message); }
         }
-        next.parkingInBase = fields.has("parkingInBase");
         const gas:GasBill = {kind:"gas",month,scope,gas:null,start:null,end:null,note:linkedGas?.note ?? ""};
         readGas(gas);
         if (linkedGas ? gas.gas!==linkedGas.gas || gas.start!==linkedGas.start || gas.end!==linkedGas.end
@@ -72,10 +71,6 @@ export function BillEditor({bill,originalKey,bills,residence,onSave,onClose}:{
             : <input name={key} inputMode="decimal" defaultValue={bill[key] ?? ""}/>}
         </label>)}
       </div>
-      {bill.kind==="management" && <>
-        <label><input type="checkbox" name="parkingInBase" defaultChecked={bill.parkingInBase} onChange={resetConfirmation}/>기본 관리비에 주차비가 이미 포함됨</label>
-        <p className="muted">주차비 칸에는 고지서 합계에 포함된 금액을 입력하세요. 기본 관리비에 주차비가 이미 포함된 경우 위 항목을 선택하면 세부 합계에 한 번만 반영됩니다. 고지서 합계는 원본대로 입력하세요. 주차비가 없다고 확인한 경우 0을 입력하세요.</p>
-      </>}
       <fieldset key={bill.kind==="gas" ? "gas" : month+scope} className="utility-fields utility-gas-fields" onChange={resetConfirmation}>
         {bill.kind==="management" && <legend>같은 청구월·데이터 유형의 가스비 (선택)</legend>}
         <label>가스요금 (원)<input name="gas" inputMode="decimal" defaultValue={(bill.kind==="gas" ? bill.gas : linkedGas?.gas) ?? ""}/></label>
