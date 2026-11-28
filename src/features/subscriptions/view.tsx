@@ -4,7 +4,7 @@ import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import type {Save} from "@/components/workspace-data";
 import type {Entry} from "../modules";
-import type {FinanceState} from "../finance/model";
+import {accountLabel,type FinanceState} from "../finance/model";
 import type {Settlements} from "../settlements/model";
 import type {Baseball} from "../baseball/model";
 import {tableDate} from "../shared/import";
@@ -60,8 +60,8 @@ export function SubscriptionsView({data,save,finance,ledger,settlements,baseball
   const provisional=due.filter(row=>!row.payment || row.payment.state==="pending");
   const estimate=amounts(due.map(row=>row.amount));
   const nameOf=(id:string)=>data.services.find(row=>row.id===id)?.title ?? "구독";
-  const accountOf=(id:string|null)=>finance.accounts.find(row=>row.id===id)?.name ?? "미지정";
-  const accountOptions=(ids:(string|null)[]=[])=>finance.accounts.filter(row=>!row.archived || ids.includes(row.id)).map(row=><option value={row.id} key={row.id}>{row.institution} · {row.name}</option>);
+  const accountOf=(id:string|null)=>accountLabel(finance.accounts.find(row=>row.id===id));
+  const accountOptions=(ids:(string|null)[]=[])=>finance.accounts.filter(row=>!row.archived || ids.includes(row.id)).map(row=><option value={row.id} key={row.id}>{accountLabel(row)}</option>);
   const saveChecked=async(next:Subscriptions)=>{
     const parsed=subscriptionsSchema.safeParse(next);
     if (!parsed.success) return "필수 항목, 날짜·금액 또는 동일 구독의 중복 결제일을 확인해 주세요.";

@@ -7,7 +7,7 @@ import type { Records } from "../modules";
 import { validMonth, type UtilityState } from "../utilities/model";
 import { AccountForm, MonthlyForm, RuleForm, TransferForm } from "./forms";
 import {
-  createMonth, estimateTotals, expected, financeStatistics, invoice, links,
+  accountLabel, accountSuggestions, createMonth, estimateTotals, expected, financeStatistics, invoice, links,
   methods, modes, outstanding, purposes, type Account, type FinanceState, type Monthly, type Payment, type Rule, type Transfer,
 } from "./model";
 
@@ -28,7 +28,7 @@ const estimateTotal = ({min,max,unknown}:ReturnType<typeof estimateTotals>)=>
 
 function paymentLabel(payment:Payment,accounts:Account[]) {
   const account = accounts.find(item=>item.id===payment.accountId);
-  return methods[payment.method]+(account ? " · "+account.institution+" "+account.name : " · 결제수단 미지정");
+  return methods[payment.method]+(account ? " · "+accountLabel(account) : " · 결제수단 미지정");
 }
 
 function replace<T extends {id:string}>(items:T[],next:T) {
@@ -74,7 +74,7 @@ function MonthlyStatistics({month,monthly,transfers,records,accounts,utilities,s
     payments.set(row.account,(payments.get(row.account) ?? 0)+row.cash*100);
   }
   for (const {row,amount} of postedExpenses(subscriptions,month)) {
-    const name="구독 · "+(accounts.find(account=>account.id===row.accountId)?.name ?? "미지정");
+    const name="구독 · "+accountLabel(accounts.find(account=>account.id===row.accountId));
     payments.set(name,(payments.get(name) ?? 0)+Math.round(amount*100));
   }
   const dates = new Map<string,ReturnType<typeof expected>[]>();
@@ -147,7 +147,7 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
             <strong>{money(paidWon(row))}</strong></li>)}</ul></section>}
         <p className="muted">이 탭에는 원본 거래금액이 표시됩니다. 본인 소비와 실제 자금 유출은 월별 통계에서 확인할 수 있습니다.</p>
       </> : tab===5 ? <SettlementsView cases={settlements} save={saveSettlements} ledger={records.finance}
-        accounts={state.accounts.filter(account=>!account.archived).map(account=>account.institution+" · "+account.name)} today={today}/> : tab===6 ? <SubscriptionsView data={subscriptions} save={saveSubscriptions} finance={state}
+        accounts={accountSuggestions(state.accounts)} today={today}/> : tab===6 ? <SubscriptionsView data={subscriptions} save={saveSubscriptions} finance={state}
           ledger={records.finance} settlements={settlements} baseball={baseball} today={today}/> : <>
         <div className="page-title finance-title">
           <h1>{tabs[tab]}</h1>
@@ -190,11 +190,14 @@ export function FinanceView({state,save,records,updateRecords,utilities,today,th
         </section>}
         {tab===3 && <section className="panel">
           <div className="finance-heading"><h2>은행 계좌와 카드</h2><Button onClick={()=>setEditing({kind:"account"})}>결제수단 등록</Button></div>
-          <ul className="rows finance-rows">{state.accounts.filter(account=>!account.archived).map(account=><li key={account.id}>
-            <div><strong>{account.name}</strong><p>{account.kind==="card" ? "카드" : "은행 계좌"} · {account.institution}</p></div>
-            <div className="row-actions"><Button variant="outline" aria-label={account.name+" 수정"} onClick={()=>setEditing({kind:"account",account})}>수정</Button>
-              <Button variant="ghost" aria-label={account.name+" 보관"} onClick={()=>setRemoving({kind:"account",id:account.id})}>보관</Button></div>
-          </li>)}</ul>
+          <ul className="rows finance-rows">{state.accounts.filter(account=>!account.archived).map(account=>{
+            const label = accountLabel(account);
+            return <li key={account.id}>
+              <div><strong>{label}</strong><p>{account.kind==="card" ? "카드" : "은행 계좌"}</p></div>
+              <div className="row-actions"><Button variant="outline" aria-label={label+" 수정"} onClick={()=>setEditing({kind:"account",account})}>수정</Button>
+                <Button variant="ghost" aria-label={label+" 보관"} onClick={()=>setRemoving({kind:"account",id:account.id})}>보관</Button></div>
+            </li>;
+          })}</ul>
         </section>}
         {tab===4 && (validMonth(month) ? <MonthlyStatistics month={month} monthly={state.monthly} transfers={state.transfers} records={records} accounts={state.accounts} utilities={utilities} settlements={settlements} baseball={baseball} subscriptions={subscriptions}/> :
           <p className="empty">조회 월을 선택해 주세요.</p>)}

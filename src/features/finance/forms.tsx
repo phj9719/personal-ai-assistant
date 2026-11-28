@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { parseNumber, validDate } from "../utilities/model";
 import {
-  methods, modes, purposes, schedules, links, validateRule, readPeriod,
+  accountDetails, accountLabel, accountTextLimit, methods, modes, purposes, schedules, links, validateRule, readPeriod,
   type Account, type Rule, type Payment, type Transfer, type Monthly, type Quote,
 } from "./model";
 
@@ -48,7 +48,7 @@ function PaymentFields({payment,accounts}:{payment?:Payment;accounts:Account[]})
     <label>결제수단<select name="accountId" value={id} onChange={event=>setId(event.target.value)}>
       <option value="">미지정</option>
       {accounts.filter(account=>(!account.archived || account.id===id) && (method==="card")===(account.kind==="card")).map(account=>
-        <option value={account.id} key={account.id}>{account.institution} · {account.name}{account.archived ? " (보관)" : ""}</option>)}
+        <option value={account.id} key={account.id}>{accountLabel(account)}{account.archived ? " (보관)" : ""}</option>)}
     </select></label>
   </>;
 }
@@ -111,14 +111,14 @@ export function MonthlyForm({row,accounts,today,onSave,onClose}:{row:Monthly;acc
 
 export function AccountForm({account,onSave,onClose}:{account?:Account;onSave:(account:Account)=>void;onClose:()=>void}) {
   return <FormDialog title={account ? "결제수단 수정" : "결제수단 등록"} onClose={onClose} onSubmit={data=>{
-    const name = field(data,"name"), institution = field(data,"institution");
-    if (!name || !institution) throw new Error("금융기관과 결제수단 이름을 입력해 주세요.");
-    onSave({id:account?.id ?? crypto.randomUUID(),name,institution,kind:field(data,"kind") as Account["kind"]});
+    const parsed = accountDetails.safeParse({name:field(data,"name"),institution:field(data,"institution"),kind:field(data,"kind")});
+    if (!parsed.success) throw new Error("유형과 은행 또는 카드사를 확인해 주세요. 기관명과 별칭은 100자까지 입력할 수 있습니다.");
+    onSave({...account,...parsed.data,id:account?.id ?? crypto.randomUUID()});
   }}>
-    <label>유형<select name="kind" defaultValue={account?.kind} disabled={!!account}><option value="bank">은행 계좌</option><option value="card">카드</option></select></label>
+    <label>유형<select name="kind" defaultValue={account?.kind} disabled={!!account} required><option value="bank">은행 계좌</option><option value="card">카드</option></select></label>
     {account && <input type="hidden" name="kind" value={account.kind}/>}
-    <label>은행 또는 카드사<input name="institution" defaultValue={account?.institution} maxLength={50} required/></label>
-    <label>결제수단 별칭<input name="name" defaultValue={account?.name} maxLength={50} required/></label>
+    <label>은행 또는 카드사<input name="institution" defaultValue={account?.institution} maxLength={accountTextLimit} required/></label>
+    <label>결제수단 별칭 (선택)<input name="name" defaultValue={account?.name} maxLength={accountTextLimit}/></label>
   </FormDialog>;
 }
 

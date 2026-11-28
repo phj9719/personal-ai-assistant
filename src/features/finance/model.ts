@@ -1,3 +1,4 @@
+import {z} from "zod";
 import {forecasts,initialSubscriptions,postedExpenses,type Subscriptions} from "../subscriptions/model.ts";
 import {baseballExpenses,initialBaseball,type Baseball} from "../baseball/model.ts";
 import {linkedIds,settlementFlows,type Settlements} from "../settlements/model.ts";
@@ -12,7 +13,25 @@ export const schedules = { exact:"정확한 날짜", approximate:"대략적인 �
 export type Purpose = keyof typeof purposes;
 export type Method = keyof typeof methods;
 export type Quote = {mode:keyof typeof modes; amount:number|null; min:number|null; max:number|null};
-export type Account = {id:string; name:string; institution:string; kind:"bank"|"card"; archived?:boolean};
+export const accountTextLimit = 100;
+export const accountDetails = z.strictObject({
+  kind:z.enum(["bank","card"]),
+  institution:z.string().trim().min(1).max(accountTextLimit),
+  name:z.string().trim().max(accountTextLimit).nullish().transform(name=>name ?? ""),
+});
+export type Account = z.output<typeof accountDetails> & {id:string;archived?:boolean};
+
+export function accountLabel(account?:Pick<Account,"institution"|"name">) {
+  if (!account) return "미지정";
+  const institution = account.institution.trim();
+  const alias = account.name?.trim();
+  return alias && alias!==institution ? institution+" · "+alias : institution;
+}
+
+export function accountSuggestions(accounts:Account[]) {
+  return [...new Set(accounts.filter(account=>!account.archived).map(accountLabel))];
+}
+
 export type Payment = {accountId:string|null;method:Method};
 export type Rule = {
   id:string; title:string; purpose:Purpose; payment:Payment; quote:Quote;

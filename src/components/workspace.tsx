@@ -7,7 +7,7 @@ import { screens } from "@/features/navigation";
 import { sampleRecords } from "@/features/modules";
 import { RecordsView, Summary } from "./records-view";
 import { Chat } from "./chat";
-import { financeStatistics, initialFinance } from "@/features/finance/model";
+import { accountSuggestions, financeStatistics, initialFinance } from "@/features/finance/model";
 import {receivableStats} from "@/features/settlements/model";
 import {BaseballView,TeamSetting} from "@/features/baseball/view";
 import {BaseballHighlights} from "@/features/baseball/panels";
@@ -75,7 +75,7 @@ export function Workspace({ screen, today, logout, demo, initialGame, initialNow
           screen === "utilities" ? <UtilitiesView state={utilities} save={saveUtilities} today={today} legacy={records.utilities}/> :
           screen === "life" ? <LifeView key={initialLifeDay} initialDay={initialLifeDay} data={life} save={saveLife} records={records} baseball={baseball} today={today} theme={theme}/> :
           screen === "baseball" ? <BaseballView key={initialGame} data={baseball} save={async next=>guard(subscriptionLinks(subscriptions,records.finance,finance,settlements,next)) && await saveBaseball(next)} ledger={records.finance} settlements={settlements}
-            accounts={finance.accounts.filter(row=>!row.archived).map(row=>row.institution+" · "+row.name)} initialNow={initialNow} theme={theme} initialSelected={initialGame}/> :
+            accounts={accountSuggestions(finance.accounts)} initialNow={initialNow} theme={theme} initialSelected={initialGame}/> :
           screen === "finance" ? <FinanceView key={initialFinanceTab} initialTab={initialFinanceTab} subscriptions={subscriptions} saveSubscriptions={saveSubscriptions} baseball={baseball} settlements={settlements} saveSettlements={async next=>{
             return guard(baseballLinks(baseball,records.finance,next) || subscriptionLinks(subscriptions,records.finance,finance,next,baseball)) && await saveSettlements(next);
           }} state={finance} save={async next=>guard(subscriptionLinks(subscriptions,records.finance,next,settlements,baseball)) && await saveFinance(next)}

@@ -5,7 +5,7 @@ import {settlementsSchema} from "./settlement-validation.ts";
 import {z} from "zod";
 import {modules} from "../features/modules.ts";
 import {billKey, validateBill, validDate, validMonth} from "../features/utilities/model.ts";
-import {readPeriod, validateRule} from "../features/finance/model.ts";
+import {accountDetails, readPeriod, validateRule} from "../features/finance/model.ts";
 import {domains, type Domain, type WorkspaceData} from "../features/workspace/data.ts";
 
 const id = z.string().min(1).max(100);
@@ -35,7 +35,7 @@ const monthly = z.strictObject({
   ruleId:id,month,title,purpose,payment,quote,timing,due:date.nullable(),utility,
   periodStart:date,periodEnd:date,paidOn:date.nullable(),paidAmount:money.nullable(),
 });
-const account = z.strictObject({id,name:title,institution:title,kind:z.enum(["bank","card"]),archived:z.boolean().optional()});
+const account = accountDetails.extend({id,archived:z.boolean().optional()});
 const transfer = z.strictObject({id,title,date,amount:money.refine(value=>value>0),purpose:z.enum(["savings","investment"]),payment});
 
 function unique<T>(items:T[], key:(item:T)=>string) {
