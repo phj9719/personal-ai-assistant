@@ -67,11 +67,11 @@ const billBase = {month,scope:z.enum(["personal","reference"]),note:description}
 const bill = z.discriminatedUnion("kind",[
   z.strictObject({...billBase,kind:z.literal("management"),electricityUsage:quantity.nullable(),electricity:money.nullable(),
     sharedElectricity:decimal(999999999999.99,2,-999999999999.99).nullable(),television:money.nullable(),
-    waterUsage:quantity.nullable(),water:money.nullable(),base:money.nullable(),total:money.nullable()}),
+    waterUsage:quantity.nullable(),water:money.nullable(),base:money.nullable(),parking:money.nullable().optional(),parkingInBase:z.boolean().optional(),total:money.nullable()}),
   z.strictObject({...billBase,kind:z.literal("gas"),gas:money.nullable(),start:date.nullable(),end:date.nullable()}),
 ]);
 const utilities = z.strictObject({residence,bills:z.array(bill).max(12000)})
-  .refine(value=>unique(value.bills,billKey) && value.bills.every(row=>!validateBill(row,value.residence).length));
+  .refine(value=>unique(value.bills,billKey) && value.bills.every(row=>!validateBill(row).length));
 
 function entries(module:keyof typeof modules) {
   const config = modules[module];
@@ -93,8 +93,8 @@ const schemas = {
   theme:z.enum(["light","dark"]),
 } satisfies {[K in Domain]:z.ZodType<WorkspaceData[K]>};
 
-export const writeRequest = z.strictObject({domain:z.enum(domains),revision:z.number().int().min(0).max(2147483646),value:z.unknown()});
-export const importRequest = z.strictObject({kind:z.literal("import"),confirmed:z.literal(true),data:z.partialRecord(z.enum(domains),z.unknown())});
+export const writeRequest = z.strictObject({domain:z.enum(domains),revision:z.number().int().min(0).max(2147483646),value:z.unknown(),confirmedOutsideResidence:z.literal(true).optional()});
+export const importRequest = z.strictObject({kind:z.literal("import"),confirmed:z.literal(true),confirmedOutsideResidence:z.literal(true).optional(),data:z.partialRecord(z.enum(domains),z.unknown())});
 export function parseDocument(domain:Domain,value:unknown) {
   return schemas[domain].safeParse(value);
 }

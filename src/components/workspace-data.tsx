@@ -4,6 +4,7 @@ import {createContext,useCallback,useContext,useEffect,useRef,useState,type Reac
 import {browserKeys,domains,emptyData,type Documents,type Domain,type WorkspaceData} from "@/features/workspace/data";
 import type {ChatAction} from "@/features/workspace/chat";
 import type {ChatSession} from "@/features/workspace/data";
+import {hasOutsideResidenceBills} from "@/features/utilities/model";
 import {Button} from "./ui/button";
 import {useLocal} from "./use-local";
 
@@ -74,7 +75,7 @@ export function WorkspaceStorage({remote,children}:{remote:boolean;children:Reac
   </StorageContext.Provider>;
 }
 
-export type Save<T> = (value:T)=>Promise<boolean>;
+export type Save<T> = (value:T,confirmedOutsideResidence?:boolean)=>Promise<boolean>;
 
 export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceData[K]):readonly [WorkspaceData[K],Save<WorkspaceData[K]>] {
   const remote = useContext(StorageContext);
@@ -82,9 +83,9 @@ export function useWorkspaceData<K extends Domain>(domain:K,fallback:WorkspaceDa
   const document = remote?.documents[domain];
   const value = remote ? (document ? document.value as WorkspaceData[K] : emptyData[domain]) : local;
   let revision = document?.revision ?? 0;
-  return [value,async (next)=>{
+  return [value,async (next,confirmedOutsideResidence)=>{
     if (remote) {
-      const saved = await remote.write({domain,revision,value:next});
+      const saved = await remote.write({domain,revision,value:next,confirmedOutsideResidence:confirmedOutsideResidence ? true : undefined});
       if (saved) revision++;
       return saved;
     }
@@ -138,9 +139,12 @@ export function BrowserImport() {
   const [preview,setPreview] = useState<Partial<Record<Domain,unknown>>|null>(null);
   const [confirmed,setConfirmed] = useState(false);
   const [status,setStatus] = useState("");
+  const [outside,setOutside] = useState(false);
+  const warns = hasOutsideResidenceBills(preview?.utilities);
 
   function showPreview(data:unknown) {
     setConfirmed(false);
+    setOutside(false);
     setPreview(null);
     if (!data || typeof data!=="object" || Array.isArray(data) ||
       Object.keys(data).some(key=>key==="theme" || !domains.includes(key as Domain))) {
@@ -190,8 +194,9 @@ export function BrowserImport() {
     {preview && <>
       <ul>{domains.filter(domain=>Object.hasOwn(preview,domain)).map(domain=><li key={domain}>{labels[domain]}</li>)}</ul>
       <label className="utility-checkbox"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>현재 계정으로 위 데이터를 가져오는 데 동의합니다.</label>
-      <div><Button disabled={!confirmed} onClick={async ()=>{
-        if (await remote.write({kind:"import",confirmed:true,data:preview})) {
+      {warns && <label className="utility-checkbox"><input type="checkbox" checked={outside} onChange={event=>setOutside(event.target.checked)}/>거주 기간과 겹치지 않는 청구를 실제 관리비로 가져오는 데 동의합니다.</label>}
+      <div><Button disabled={!confirmed || (warns && !outside)} onClick={async ()=>{
+        if (await remote.write({kind:"import",confirmed:true,confirmedOutsideResidence:outside ? true : undefined,data:preview})) {
           setPreview(null);
           setConfirmed(false);
           setStatus("데이터를 가져왔습니다.");

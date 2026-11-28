@@ -1,7 +1,7 @@
 import {forecasts,initialSubscriptions,postedExpenses,type Subscriptions} from "../subscriptions/model.ts";
 import {baseballExpenses,initialBaseball,type Baseball} from "../baseball/model.ts";
 import {linkedIds,settlementFlows,type Settlements} from "../settlements/model.ts";
-import { effectiveScope, validDate, validMonth, type UtilityState } from "../utilities/model.ts";
+import { validDate, validMonth, type UtilityState } from "../utilities/model.ts";
 
 export const purposes = { consumption:"일반 소비", savings:"저축", investment:"투자" } as const;
 export const methods = { transfer:"직접이체", debit:"자동출금", card:"카드결제" } as const;
@@ -77,7 +77,7 @@ export function createMonth(rules:Rule[], rows:Monthly[], month:string) {
 
 export function invoice(row:Monthly, utility:UtilityState) {
   if (!row.utility) return null;
-  const bill = utility.bills.find(bill=>bill.kind===row.utility && bill.month===row.month && effectiveScope(bill,utility.residence)==="personal");
+  const bill = utility.bills.find(bill=>bill.kind===row.utility && bill.month===row.month && bill.scope==="personal");
   return bill ? (bill.kind==="gas" ? bill.gas : bill.total) : null;
 }
 

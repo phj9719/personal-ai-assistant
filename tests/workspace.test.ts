@@ -21,6 +21,15 @@ test("accepts browser datasets and rejects duplicate or invalid expenses and bil
   const utility = sampleUtilities(today);
   assert.ok(parseDocument("utilities",utility).success);
   assert.equal(parseDocument("utilities",{...utility,bills:[...utility.bills,utility.bills[0]]}).success,false);
+  const bills = [
+    {...utility.bills[0],scope:"reference",parking:0},
+    {...utility.bills[0],scope:"personal",parking:null},
+  ];
+  assert.ok(parseDocument("utilities",{...utility,bills}).success);
+  assert.equal(parseDocument("utilities",{...utility,bills:[{...bills[0],parking:-1}]}).success,false);
+  const legacy = Object.fromEntries(Object.entries(bills[0]).filter(([key])=>key!=="parking" && key!=="parkingInBase"));
+  assert.ok(parseDocument("utilities",{...utility,bills:[legacy]}).success);
+  assert.ok(writeRequest.safeParse({domain:"utilities",revision:0,value:utility,confirmedOutsideResidence:true}).success);
 });
 
 test("requires explicit import confirmation and rejects a client-supplied owner",()=>{

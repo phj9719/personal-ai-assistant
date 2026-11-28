@@ -3,17 +3,18 @@
 import { useState } from "react";
 import { Download, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { comparison, billKey, blankBill, effectiveScope, housing, kindNames, managementBreakdown, managementFields,
-  managementKeys, missing, personalStatistics, replaceBills, scopeNames, shiftMonth, validDate, withinResidence,
+import { billKey, blankBill, housing, kindNames, managementBreakdown, managementFields, managementKeys,
+  metrics, missing, monthlyBills, personalStatistics, replaceBills, scopeNames, validDate, withinResidence,
   type Bill, type Residence, type Scope, type UtilityState } from "./model";
 import { UtilityCharts } from "./charts";
+import { UtilityComparison } from "./comparison";
 import { BillEditor } from "./editor";
 import { downloadBills, ImportPanel } from "./import-panel";
 import type { Entry } from "../modules";
 
 const number = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:3});
 const money = (amount:number|null) => amount===null ? missing : number.format(amount)+"원";
-const amountText = (amount:number|null,unit:string) => amount===null ? missing : number.format(amount)+unit;
+const amountText = (amount:number|null|undefined,unit:string) => amount==null ? missing : number.format(amount)+unit;
 
 function ResidenceSettings({residence,onSave}:{residence:Residence;onSave:(value:Residence)=>void}) {
   const [error,setError] = useState("");
@@ -35,7 +36,7 @@ function ResidenceSettings({residence,onSave}:{residence:Residence;onSave:(value
         <label>거주 시작일<input name="start" type="date" defaultValue={residence.start ?? ""}/></label>
         <label>거주 종료일<input name="end" type="date" defaultValue={residence.end ?? ""}/></label>
       </div>
-      <p className="muted">거주 기간에 완전히 포함되지 않은 청구월과 가스 사용 기간은 참고용입니다. 거주 기간 변경만으로 참고용 내역을 본인 내역으로 바꾸지 않습니다.</p>
+      <p className="muted">청구월이나 가스 사용 기간이 거주 기간에 일부라도 겹치면 등록할 수 있습니다. 거주 기간 설정을 바꿔도 저장된 데이터 유형과 금액은 유지됩니다.</p>
       {error && <p role="alert">{error}</p>}
       <div><Button type="submit">거주 기간 저장</Button></div>
     </form>
@@ -51,6 +52,10 @@ function BillDetails({bill}:{bill:Bill}) {
         <tr><th scope="row">사용 시작일</th><td>{bill.start ?? missing}</td></tr>
         <tr><th scope="row">사용 종료일</th><td>{bill.end ?? missing}</td></tr>
       </>}
+      {bill.kind==="management" && <>
+        {bill.parkingInBase && <tr><th scope="row">주차비 처리</th><td>기본 관리비에 포함</td></tr>}
+        <tr><th scope="row">주차비 제외 관리비</th><td>{bill.parking==null ? "주차비 미입력" : money(metrics([bill]).withoutParking)}</td></tr>
+      </>}
       {breakdown && <>
         <tr><th scope="row">세부 항목 합계{breakdown.complete ? "" : " (확인분)"}</th><td>{money(breakdown.subtotal)}</td></tr>
         <tr><th scope="row">차액 (고지서 − 세부 합계)</th><td>{money(breakdown.difference)}{breakdown.difference!==null && !breakdown.complete && " · 확인분 기준"}</td></tr>
@@ -61,30 +66,26 @@ function BillDetails({bill}:{bill:Bill}) {
 }
 
 type Filter = "all" | Scope;
-export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save:(value:UtilityState)=>Promise<boolean>;today:string;legacy:Entry[]}) {
+export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save:(value:UtilityState,confirmed?:boolean)=>Promise<boolean>;today:string;legacy:Entry[]}) {
   const {bills,residence} = state;
   const current = today.slice(0,7);
   const [year,setYear] = useState(current.slice(0,4));
   const [month,setMonth] = useState("");
   const [scope,setScope] = useState<Filter>("all");
-  const [reference,setReference] = useState(false);
   const [editing,setEditing] = useState<{bill:Bill;originalKey?:string}|null>(null);
   const [deleting,setDeleting] = useState<Bill|null>(null);
   const [importing,setImporting] = useState(false);
   const [status,setStatus] = useState("");
   const years = [...new Set([current.slice(0,4),...bills.map(bill=>bill.month.slice(0,4))])].sort().reverse();
-  const visible = bills.filter(bill=>(!year || bill.month.startsWith(year)) && (!month || bill.month.endsWith(month)) && (scope==="all" || effectiveScope(bill,residence)===scope))
+  const visible = bills.filter(bill=>(!year || bill.month.startsWith(year)) && (!month || bill.month.endsWith(month)) && (scope==="all" || bill.scope===scope))
     .sort((a,b)=>b.month.localeCompare(a.month) || b.kind.localeCompare(a.kind));
-  const aggregate = personalStatistics(visible,residence);
+  const aggregate = personalStatistics(visible);
   const compared = year && month ? year+month : visible[0]?.month ?? (year ? year+(year===current.slice(0,4) ? current.slice(4) : "-12") : current);
-  const now = comparison(bills,compared,residence,false);
-  const previous = comparison(bills,shiftMonth(compared,-1),residence,false);
-  const lastYear = comparison(bills,shiftMonth(compared,-12),residence,reference);
   function create(kind:Bill["kind"]) {
-    const month = compared;
-    setEditing({bill:blankBill(kind,month,withinResidence(month,residence) ? "personal" : "reference")});
+    const type = scope==="all" ? withinResidence(compared,residence) ? "personal" : "reference" : scope;
+    setEditing({bill:blankBill(kind,compared,type)});
   }
-  const grouped = [...new Set(visible.map(bill=>bill.month))];
+  const grouped = monthlyBills(visible);
   return <>
     <div className="page-title utility-title">
       <div><h1>관리비 및 공과금</h1><p className="muted">월별 고지서와 가스비를 관리하고 거주 기간의 지출을 확인하세요.</p></div>
@@ -96,13 +97,13 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
       </div>
     </div>
     <ResidenceSettings residence={residence} onSave={async next=>{
-      if (!await save({residence:next,bills:bills.map(bill=>({...bill,scope:effectiveScope(bill,next)}))})) return;
+      if (!await save({residence:next,bills})) return;
       setStatus("거주 기간을 저장했습니다.");
     }}/>
     <section className="panel utility-filters" aria-label="조회 조건">
       <label>연도<select value={year} onChange={event=>setYear(event.target.value)}><option value="">전체 연도</option>{years.map(item=><option key={item}>{item}</option>)}</select></label>
       <label>월<select value={month} onChange={event=>setMonth(event.target.value)}><option value="">전체 월</option>{Array.from({length:12},(_,index)=><option key={index} value={"-"+String(index+1).padStart(2,"0")}>{index+1}월</option>)}</select></label>
-      <label>사용 구분<select value={scope} onChange={event=>setScope(event.target.value as Filter)}><option value="all">전체</option>{Object.entries(scopeNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <label>데이터 유형<select value={scope} onChange={event=>setScope(event.target.value as Filter)}><option value="all">전체 데이터</option>{Object.entries(scopeNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
     </section>
     {status && <p className="utility-status" role="status">{status}</p>}
     <div className="stats utility-stats">
@@ -110,35 +111,23 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
       <div className="panel stat"><span>조회 기간 본인 월평균</span><strong>{money(aggregate.average)}</strong></div>
       <div className="panel stat"><span>금액이 있는 본인 청구월</span><strong>{aggregate.months}개월</strong></div>
     </div>
-    <section className="panel">
-      <h2>{compared} 본인 주거비 비교</h2>
-      <label className="utility-checkbox"><input type="checkbox" checked={reference} onChange={event=>setReference(event.target.checked)}/>전년 동월에 본인 기록이 없으면 참고용 내역 사용</label>
-      <div className="utility-comparison">
-        <div><span>기준월</span><strong>{now.total===null ? "비교 데이터 없음" : money(now.total)}</strong>{now.total!==null && !now.complete && <small>확인분</small>}</div>
-        {([["전월",previous],["전년 동월",lastYear]] as const).map(([label,data])=>{
-          return <div key={label}><span>{label}</span><strong>{data.total===null ? "비교 데이터 없음" : money(data.total)}</strong>
-            {data.total!==null && <small>{data.scope==="reference" ? "참고용 · " : ""}{now.complete && data.complete && now.total!==null ? "차이 "+money(now.total-data.total) : "비교 가능한 전체 금액 없음"}</small>}
-          </div>;
-        })}
-      </div>
-    </section>
+    <UtilityComparison bills={bills} month={compared} scope={scope}/>
     <section className="panel">
       <h2>월별 상세 내역</h2>
       <p className="muted">—는 미청구 또는 미확인입니다. 확인분은 등록된 금액만 합산합니다.</p>
-      {!grouped.length ? <p className="empty">조회 조건에 맞는 청구 내역이 없습니다.</p> : grouped.map(month=>{
-        const rows = visible.filter(bill=>bill.month===month);
+      {!grouped.size ? <p className="empty">조회 조건에 맞는 청구 내역이 없습니다.</p> : [...grouped].map(([month,rows])=>{
         return <section key={month} className="utility-month">
           <h3>{month}</h3>
           {(["personal","reference"] as const).map(scope=>{
-            const entries = rows.filter(bill=>effectiveScope(bill,residence)===scope);
+            const entries = rows.filter(bill=>bill.scope===scope);
             if (!entries.length) return null;
             const total = housing(entries);
             return <div key={scope} className="utility-group">
               <p><strong>{scopeNames[scope]}</strong> <span>총 주거비 {money(total.total)}{total.total!==null && !total.complete ? " · 확인분" : ""}</span></p>
               <ul className="utility-bills">{entries.map(bill=><li key={billKey(bill)}>
                 <div className="utility-bill-heading"><strong>{kindNames[bill.kind]}</strong><span>{money(bill.kind==="gas" ? bill.gas : bill.total)}</span></div>
-                <div className="row-actions"><Button variant="outline" aria-label={month+" "+kindNames[bill.kind]+" 수정"} onClick={()=>setEditing({bill,originalKey:billKey(bill)})}>수정</Button>
-                  <Button variant="ghost" aria-label={month+" "+kindNames[bill.kind]+" 삭제"} onClick={()=>setDeleting(bill)}>삭제</Button></div>
+                <div className="row-actions"><Button variant="outline" aria-label={month+" "+kindNames[bill.kind]+" 수정 ("+scopeNames[bill.scope]+")"} onClick={()=>setEditing({bill,originalKey:billKey(bill)})}>수정</Button>
+                  <Button variant="ghost" aria-label={month+" "+kindNames[bill.kind]+" 삭제 ("+scopeNames[bill.scope]+")"} onClick={()=>setDeleting(bill)}>삭제</Button></div>
                 <BillDetails bill={bill}/>
               </li>)}</ul>
             </div>;
@@ -146,19 +135,20 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
         </section>;
       })}
     </section>
-    <UtilityCharts bills={visible} residence={residence}/>
+    <UtilityCharts bills={visible}/>
     {!!legacy.length && <details className="panel"><summary>이전 형식의 공과금 기록</summary><p className="muted">이전 기록은 아래에서 확인할 수 있습니다. 청구 종류와 사용 구분을 확인한 뒤 월별 청구로 등록하세요.</p>
       <ul>{legacy.map(row=><li key={row.id}>{row.date} · {row.title} · {money(row.amount)} · {row.detail}</li>)}</ul></details>}
-    {editing && <BillEditor {...editing} bills={bills} residence={residence} onClose={()=>setEditing(null)} onSave={async bill=>{
-      if (!await save({...state,bills:replaceBills(bills.filter(item=>billKey(item)!==editing.originalKey),[bill])})) return;
+    {editing && <BillEditor {...editing} bills={bills} residence={residence} onClose={()=>setEditing(null)} onSave={async (changes,confirmed)=>{
+      const [bill] = changes;
+      if (!await save({...state,bills:replaceBills(bills.filter(item=>billKey(item)!==editing.originalKey),changes)},confirmed)) return;
       setEditing(null);
       setYear(bill.month.slice(0,4));
       if (month) setMonth(bill.month.slice(4));
       setScope("all");
       setStatus("청구 내역을 저장했습니다.");
     }}/>}
-    {importing && <ImportPanel state={state} onClose={()=>setImporting(false)} onImport={async changes=>{
-      if (!await save({...state,bills:replaceBills(bills,changes)})) return;
+    {importing && <ImportPanel state={state} onClose={()=>setImporting(false)} onImport={async (changes,confirmed)=>{
+      if (!await save({...state,bills:replaceBills(bills,changes)},confirmed)) return;
       setImporting(false);
       const last = changes.map(bill=>bill.month).sort().at(-1);
       if (last) setYear(last.slice(0,4));
@@ -167,7 +157,7 @@ export function UtilitiesView({state,save,today,legacy}:{state:UtilityState;save
       setStatus(changes.length+"건을 가져왔습니다.");
     }}/>}
     {deleting && <dialog ref={node=>{if (node && !node.open) node.showModal();}} onCancel={()=>setDeleting(null)} aria-labelledby="utility-delete" className="dialog">
-      <h2 id="utility-delete">청구 삭제</h2><p>{deleting.month} {kindNames[deleting.kind]} 내역을 삭제할까요?</p>
+      <h2 id="utility-delete">청구 삭제</h2><p>{deleting.month} {scopeNames[deleting.scope]} · {kindNames[deleting.kind]} 내역을 삭제할까요?</p>
       <div className="row-actions"><Button variant="outline" onClick={()=>setDeleting(null)}>취소</Button><Button onClick={async ()=>{
         if (!await save({...state,bills:bills.filter(bill=>billKey(bill)!==billKey(deleting))})) return;
         setDeleting(null);

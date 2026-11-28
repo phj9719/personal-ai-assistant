@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  blankBill, comparison, effectiveScope, housing, managementBreakdown, parseNumber, personalStatistics, replaceBills,
+  blankBill, change, comparison, housing, managementBreakdown, metrics, monthlyBills, needsResidenceConfirmation,
+  parseNumber, personalStatistics, replaceBills, residenceWarnings, selectBills, yearComparison,
   validateBill, type Bill, type ManagementBill,
 } from "../src/features/utilities/model.ts";
 import {exportBills, importBills} from "../src/features/utilities/import.ts";
 
-const residence = {start:"2026-03-15",end:"2026-08-20"};
+const residence = {start:"2026-02-09",end:"2026-08-20"};
 function management(month:string,total:number|null,scope:"personal"|"reference"="personal"):ManagementBill {
   const bill = blankBill("management",month,scope);
   assert.equal(bill.kind,"management");
@@ -37,18 +38,71 @@ test("calculates the gap against the invoice and marks partial amounts",()=>{
   assert.equal(replaceBills([bill],[gas]).length,2);
 });
 
-test("excludes unidentified, out-of-residence and reference bills from own totals",()=>{
-  const bills = [management("2026-03",300),management("2026-04",0),management("2026-05",null),
-    management("2026-06",15000,"reference"),management("2026-07",200),management("2026-08",500)];
-  assert.deepEqual(personalStatistics(bills,residence),{total:200,average:100,months:2});
-  assert.equal(effectiveScope(bills[3],{start:"2020-01-01",end:null}),"reference");
-  assert.equal(comparison(bills,"2026-03",residence,false).total,null);
-  assert.deepEqual(comparison(bills,"2026-03",residence,true),{total:300,complete:false,scope:"reference"});
-  assert.equal(comparison(bills,"2025-03",residence,true).total,null);
-  const gas:Bill = {kind:"gas",month:"2026-04",scope:"personal",gas:100,start:"2026-03-01",end:"2026-04-02",note:""};
-  assert.equal(effectiveScope(gas,residence),"reference");
-  assert.ok(validateBill(gas,residence).length);
-  assert.ok(validateBill({...gas,scope:"reference",start:"2026-04-31"},residence).length);
+test("allows move-in, move-out, and partially overlapping gas periods without repricing",()=>{
+  for (const month of ["2026-02","2026-03","2026-08"]) {
+    const bill = management(month,15000);
+    assert.deepEqual(residenceWarnings(bill,residence),[]);
+    assert.deepEqual(validateBill(bill),[]);
+  }
+  const gas:Bill = {kind:"gas",month:"2026-02",scope:"personal",gas:100,start:"2026-01-10",end:"2026-02-09",note:""};
+  assert.deepEqual(residenceWarnings(gas,residence),[]);
+  assert.equal(residenceWarnings({...gas,end:"2026-02-08"},residence).length,1);
+  assert.ok(validateBill({...gas,scope:"reference",start:"2026-04-31"}).length);
+  assert.ok(validateBill({...gas,start:"2026-02-19"}).length);
+  assert.deepEqual(residenceWarnings(management("2025-04",100,"reference"),residence),[]);
+});
+
+test("requires acknowledgement only for changed actual bills outside residence and honors saved scopes",()=>{
+  const first = management("2025-04",15000);
+  const reference = {...first,scope:"reference" as const,total:16000};
+  const old = {residence,bills:[first,reference]};
+  assert.equal(needsResidenceConfirmation(undefined,old),true);
+  assert.equal(needsResidenceConfirmation(old,{...old,residence:{...residence,end:null}}),false);
+  assert.equal(needsResidenceConfirmation(old,{...old,bills:[{...first,parking:100},reference]}),true);
+  assert.equal(needsResidenceConfirmation(old,{...old,bills:[reference]}),false);
+  assert.deepEqual(personalStatistics(old.bills),{total:15000,average:15000,months:1});
+  assert.deepEqual(comparison(old.bills,"2025-04",true),{total:15000,complete:false,scope:"personal"});
+  assert.deepEqual(comparison([reference],"2025-04",true),{total:16000,complete:false,scope:"reference"});
+  assert.equal(comparison([reference],"2025-04",false).total,null);
+  assert.equal(comparison(old.bills,"2025-03",true).total,null);
+  assert.equal(replaceBills(old.bills,[{...reference,total:9000}]).length,2);
+});
+
+test("uses parking only once in the breakdown and never modifies the invoice",()=>{
+  const bill = {...management("2026-02",75000),electricity:8000,sharedElectricity:-500,water:5000,base:60000,parking:5000};
+  const inBase = {...bill,parkingInBase:true};
+  assert.deepEqual(managementBreakdown(bill),{subtotal:80000,complete:true,difference:-5000});
+  assert.deepEqual(managementBreakdown(inBase),{subtotal:75000,complete:true,difference:0});
+  assert.equal(metrics([inBase]).total,75000);
+  assert.equal(metrics([inBase]).withoutParking,70000);
+  assert.equal(metrics([{...bill,parking:0}]).withoutParking,75000);
+  assert.equal(metrics([{...bill,parking:undefined}]).withoutParking,null);
+  const gas:Bill = {kind:"gas",month:bill.month,scope:"personal",gas:15000,start:null,end:null,note:""};
+  assert.equal(metrics([inBase,gas]).housing,90000);
+  assert.equal(metrics([inBase,gas]).housingWithoutParking,85000);
+  assert.equal(metrics([inBase]).housingWithoutParking,null);
+});
+
+test("compares the matching prior month, prefers actual records, and counts only paired months for annual totals",()=>{
+  const bills = [
+    {...management("2026-02",75000),parking:5000,electricityUsage:80},
+    {...management("2025-02",65000),parking:5000,electricityUsage:100},
+    {...management("2025-02",90000,"reference"),parking:5000},
+    {...management("2026-03",87000),parking:0},
+    {...management("2025-03",70000,"reference"),parking:0},
+    {...management("2026-04",95000),parking:0},
+    {...management("2025-05",88000,"reference"),parking:0},
+  ];
+  const index = monthlyBills(bills);
+  const selected = metrics(selectBills(index.get("2025-02")!,"all"));
+  assert.equal(selected.electricityUsage,100);
+  assert.deepEqual(change(80,selected.electricityUsage),{difference:-20,rate:-20});
+  assert.deepEqual(change(5,0),{difference:5,rate:null});
+  assert.deepEqual(change(0,null),{difference:null,rate:null});
+  assert.equal(change(7.2,6.1).difference,1.1);
+  assert.deepEqual(yearComparison(index,"2026","all","withoutParking").filter(row=>row.current!==null && row.previous!==null),[
+    {month:"02월",current:70000,previous:60000},{month:"03월",current:87000,previous:70000},
+  ]);
 });
 
 test("previews spreadsheet, Markdown and CSV rows without treating past data as personal",()=>{
@@ -67,5 +121,20 @@ test("previews spreadsheet, Markdown and CSV rows without treating past data as 
   const duplicate = importBills("청구월,구분,가스요금\n2026-04,가스비,0\n2026-04,가스비,100",[],residence);
   assert.ok(duplicate[1].errors.length);
   const invalid = importBills("청구월,구분,사용 구분,가스요금\n2026-03,가스비,본인 사용 내역,-1",[],residence);
-  assert.equal(invalid[0].errors.length,2);
+  assert.equal(invalid[0].errors.length,1);
+  const withParking = importBills("청구월,데이터 유형,주차비,관리비 고지서 합계,기본 관리비에 주차비 포함,가스비 사용 기간\n2025-04,참고용 관리비,0,12000,예,2025-03-01 ~ 2025-04-01",[],residence);
+  const [invoice,gas] = withParking.map(row=>row.bill);
+  assert.equal(invoice?.kind==="management" && invoice.parking,0);
+  assert.equal(invoice?.kind==="management" && invoice.parkingInBase,true);
+  assert.equal(gas?.kind==="gas" && gas.start,"2025-03-01");
+  assert.equal(withParking[1].warnings.length,0);
+  const bulk = importBills("청구월,사용 구분,주차비,관리비 합계\n2025-04,참고용 내역,,12000",[],residence,"personal");
+  assert.equal(bulk[0].warnings.length,1);
+  assert.equal(bulk[0].bill?.kind==="management" && bulk[0].bill.parking,null);
+  assert.equal(bulk[0].errors.length,0);
+  const legacy = "청구월,관리비 합계\n2026-04,15000";
+  const retained = importBills(legacy,[{...original,parking:2000}],residence);
+  assert.equal(retained[0].bill?.kind==="management" && retained[0].bill.parking,2000);
+  assert.ok(importBills(legacy,[original,{...original,scope:"reference"}],residence)[0].errors.length);
+  assert.equal(importBills(legacy,[original],residence,"reference")[0].duplicate,false);
 });

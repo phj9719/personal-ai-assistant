@@ -48,6 +48,7 @@ test("uses own utility invoices for outstanding estimates only and prevents dupl
   assert.equal(rows.length,1);
   assert.notEqual(validateRule(duplicate,[linked]),"");
   assert.equal(invoice(rows[0],utility),43000);
+  assert.equal(invoice(rows[0],{...housing,bills:[{...bill,total:35000,scope:"reference"},{...bill,total:43000,parking:6000}]}),43000);
   assert.equal(invoice(rows[0],{...housing,bills:[{...bill,total:43000,scope:"reference"}]}),null);
   assert.equal(outstanding(rows[0],utility).amount,43000);
   const planned = financeStatistics("2024-02",rows,[],[],utility);

@@ -67,7 +67,7 @@ export function Workspace({ screen, today, logout, demo, initialGame, initialNow
             <TeamSetting team={baseball.team} save={team=>saveBaseball({...baseball,team})}/></> :
           screen === "dashboard" ? <>
             <Summary demo={demo} receivables={receivableStats(settlements,today.slice(0,7),today)} records={records}
-              today={today} consumption={consumption!} housingCost={comparison(utilities.bills,today.slice(0,7),utilities.residence,false)}/>
+              today={today} consumption={consumption!} housingCost={comparison(utilities.bills,today.slice(0,7),false)}/>
             {noticeEvents.length>0 && <section className="panel"><h2>구독 알림</h2><ul className="rows">{noticeEvents.map(row=><li key={row.id}>
               <Link href="/finance?tab=subscriptions">{row.title}</Link><span>{row.date}</span></li>)}</ul></section>}
             <section><h2>야구 일정</h2><BaseballHighlights data={baseball} now={initialNow}/></section>

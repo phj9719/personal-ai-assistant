@@ -1,34 +1,44 @@
 "use client";
 
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { effectiveScope, housing, scopeNames, type Bill, type Residence, type Scope } from "./model";
+import { comparisonFields, metrics as billMetrics, monthlyBills, scopeNames, type Bill, type ComparisonKey, type Scope } from "./model";
 
 const series = {
   electricityUsage:"전기 사용량 (kWh)", electricity:"전기요금 (원)", waterUsage:"수도 사용량 (㎥)", water:"수도요금 (원)",
-  gas:"가스요금 (원)", management:"관리비 합계 (원)", housing:"총 주거비 (원)",
+  gas:"가스요금 (원)", total:"관리비 고지서 합계 (원)", withoutParking:"주차비 제외 관리비 (원)", housing:"총 주거비 (원)",
 };
 type Metric = keyof typeof series;
 const charts: {title:string; metrics:Metric[]; usage?:Metric}[] = [
   {title:"전기 사용량과 요금",metrics:["electricityUsage","electricity"],usage:"electricityUsage"},
   {title:"수도 사용량과 요금",metrics:["waterUsage","water"],usage:"waterUsage"},
   {title:"가스비",metrics:["gas"]},
-  {title:"관리비와 총 주거비",metrics:["management","housing"]},
+  {title:"관리비와 총 주거비",metrics:["total","withoutParking","housing"]},
 ];
 
-export function UtilityCharts({bills,residence}:{bills:Bill[];residence:Residence}) {
-  const scopes = (["personal","reference"] as const).filter(scope=>bills.some(bill=>effectiveScope(bill,residence)===scope));
-  const rows = [...new Set(bills.map(bill=>bill.month))].sort().map(month=>{
+export function YearComparisonChart({rows,year,metric}:{rows:{month:string;current:number|null;previous:number|null}[];year:string;metric:ComparisonKey}) {
+  const label = comparisonFields[metric];
+  return <div className="utility-year-chart">
+    <h3>{label.label} 월별 비교 ({label.unit})</h3>
+    {rows.some(row=>row.current!==null || row.previous!==null) ? <ResponsiveContainer width="100%" height={235} minWidth={0}>
+      <LineChart data={rows} margin={{left:4,right:12,top:8,bottom:0}}>
+        <CartesianGrid vertical={false} stroke="var(--line)"/>
+        <XAxis dataKey="month" tick={{fill:"var(--muted)",fontSize:11}} minTickGap={12}/>
+        <YAxis width={51} tick={{fill:"var(--muted)",fontSize:11}} tickFormatter={value=>Intl.NumberFormat("ko-KR",{notation:"compact"}).format(value)}/>
+        <Tooltip contentStyle={{background:"var(--surface)",color:"var(--ink)",borderColor:"var(--line)"}}/>
+        <Legend/>
+        <Line name={year+"년"} dataKey="current" stroke="var(--accent)" isAnimationActive={false}/>
+        <Line name={String(Number(year)-1)+"년"} dataKey="previous" stroke="var(--utility-secondary)" strokeDasharray="5 4" isAnimationActive={false}/>
+      </LineChart>
+    </ResponsiveContainer> : <p className="muted">비교 데이터 없음</p>}
+  </div>;
+}
+
+export function UtilityCharts({bills}:{bills:Bill[]}) {
+  const scopes = (["personal","reference"] as const).filter(scope=>bills.some(bill=>bill.scope===scope));
+  const rows = [...monthlyBills(bills)].sort(([a],[b])=>a.localeCompare(b)).map(([month,group])=>{
     const data:Record<string,string|number|null> = {month};
     for (const scope of scopes) {
-      const group = bills.filter(bill=>bill.month===month && effectiveScope(bill,residence)===scope);
-      const management = group.find(bill=>bill.kind === "management");
-      const gas = group.find(bill=>bill.kind === "gas");
-      const total = housing(group);
-      const values:Record<Metric,number|null> = {
-        electricityUsage:management?.electricityUsage ?? null,electricity:management?.electricity ?? null,
-        waterUsage:management?.waterUsage ?? null,water:management?.water ?? null,
-        gas:gas?.gas ?? null,management:management?.total ?? null,housing:total.complete ? total.total : null,
-      };
+      const values = billMetrics(group.filter(bill=>bill.scope===scope));
       for (const metric of Object.keys(series) as Metric[]) data[scope+":"+metric] = values[metric];
     }
     return data;
